@@ -56,3 +56,51 @@ higher; it costs 5–70 ms of queue latency per frame to realize it.
 - **B2** — Triton without the tax (CUDA shm): 654–1131 fps, 1.28 ms.
 - **C2** — Python without the tax (numpy + sys-shm + processes): 1038 fps, 1.69 ms.
 - **D** — GPU-efficient batching: 0.61 ms/frame GPU cost, 1665 fps, 6–70 ms wait.
+---
+
+# Flow E — DeepStream (added: closes the loop)
+
+DeepStream 7.1: nvv4l2decoder (NVDEC, NVMM zero-copy) -> nvstreammux (batched) ->
+nvinfer -> fakesink. **Same weights**: same ONNX (md5-verified), FP16 engines built
+in-container with TRT 10.3 (same ONNX gives 0.969 ms GPU — parity with TRT 10.7
+engine 0.970 ms). Same preprocessing via nvinfer (1/255, aspect-ratio, symmetric
+padding) + marcoslucianops YOLO parser; postproc semantics differ slightly
+(cluster-mode=2 vs our class-aware NMS — detection counts differ, inference cost
+does not).
+
+## E1 — single stream (vs latency-optimized flows)
+
+| Flow | Latency p50 (decode->infer->parse) | fps (RTSP source-bound) |
+|---|---|---|
+| A2 (C++ full-CUDA) | 1.25 ms | ~20-23 |
+| B2 (C++->Triton, CUDA shm) | 1.55 ms | ~12 |
+| **E1 (DeepStream)** | **1.50 ms** | **45** |
+| C2 (Python numpy) | ~2-8 ms | ~8-20 |
+
+E1 latency sits between A2 and B1 — all in the same league; DeepStream has no RPC
+at all and its batch-window is negligible at batch=1.
+
+## E2 — multi-stream batched (vs Flow D throughput arm)
+
+| Config | Total fps | fps/stream | Latency p50 | GPU util |
+|---|---|---|---|---|
+| D: async dyn-batch, conc=16 (file mode, no source cap) | 1665 | 104 | 74 ms | 79% |
+| **E2: DeepStream 8 streams (RTSP 30fps sources)** | **226** | 28 | **32.7 ms** | 5.4% |
+| E2: DeepStream 6 streams | 169 | 28 | 32.5 ms | - |
+| E2: DeepStream 3 streams | 104 | 34.5 | 3.1 ms | - |
+
+**Key reading**: E2 is *source-bound* — 8x30fps = 240 fps demand, and it delivers
+226 fps (94% of source capacity) with only 5.4% GPU. The 33 ms p50 is the
+streammux batch-assembly wait (batch=8 at 30fps sources fills every ~33 ms), not
+inference. To compare against D's 1665 fps, E2 would need the file-replay
+capacity mode (same frames.bin trick) — that would show DeepStream's true
+batched-inference ceiling, which its per-batch overhead (no RPC at all) should
+push above D.
+
+## Notes
+- DeepStream container ran TensorRT 10.3 (vs 10.7 in Triton container): engines
+  rebuilt from the identical ONNX (md5 0fa8a04298da24d785b29f001a8c139e verified);
+  trtexec parity: 1030 vs 1028 qps — negligible.
+- DeepStream uses nvstreammux batch-assembly (fixed batch) vs Triton dynamic
+  batching (queue+delay): E2's batch wait is deterministic (sources arrive at
+  fixed rate), D's depends on client in-flight patterns.
