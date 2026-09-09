@@ -40,24 +40,32 @@ the batch-8 engine = 4.84 ms/8 frames = **0.61 ms/frame (1630 fps effective)**.
 
 ---
 
-## 2. Capacity results — every cell shows `fps · ms-per-frame`
+## 2. Capacity results
 
-`ms/frame` = p50 end-to-end latency for one frame at that concurrency.
-For **D** it splits into *queue wait* (batch assembly) and *GPU service*
-(4.84 ms ÷ 8 = 0.61 ms) — both shown.
+Two numbers per cell. **`fps↑` = throughput (higher is better) · `ms↓` = per-frame
+latency p50 (lower is better)**. Best value per row is **bold**.
 
 | Concurrency | A1 | A2 | B1 | B2 | C1 (torch) | C2 (numpy) | D (async batch-8) |
 |---|---|---|---|---|---|---|---|
-| 1 | 456 · 1.32 ms | **809 · 1.23 ms** | 222 · 3.27 ms | 654 · 1.28 ms | 144 · 6.4 ms | 469 · 1.69 ms | 1041 · **6.2 ms wait** (0.61 ms svc) |
-| 2 | 793 · 1.50 ms | — | 368 · 4.03 ms | 951 · 1.83 ms | 198 · 9.6 ms | 736 · 2.20 ms | 1136 · 11.1 ms wait |
-| 4 | 956 · 3.31 ms | — | 472 · 6.90 ms | 1092 · 4.02 ms | 218 · 10.8 ms | 986 · 3.15 ms | 1378 · 19.2 ms wait |
-| 8 | 1055 · 6.43 ms | — | 488 · 14.6 ms | 1131 · 6.60 ms | 222 · 12.0 ms | 1037 · 6.86 ms | 1640 · 36.6 ms wait |
-| 16 | 1205 · 11.8 ms | — | 496 · 30.4 ms | 1128 · 13.5 ms | 225 · 14.7 ms | 1038 · 14.5 ms | 1665 · **73.9 ms wait** (0.61 ms svc) |
+| 1 | 456↑ · 1.32↓ | **809↑ · 1.23↓** | 222↑ · 3.27↓ | 654↑ · 1.28↓ | 144↑ · 6.4↓ | 469↑ · 1.69↓ | **1041↑** · wait 6.2↓svc 0.61 |
+| 2 | 793↑ · 1.50↓ | — | 368↑ · 4.03↓ | **951↑ · 1.83↓** | 198↑ · 9.6↓ | 736↑ · 2.20↓ | **1136↑** · wait 11.1 svc 0.61 |
+| 4 | 956↑ · 3.31↓ | — | 472↑ · 6.90↓ | **1092↑ · 4.02↓** | 218↑ · 10.8↓ | 986↑ · 3.15↓ | **1378↑** · wait 19.2 svc 0.61 |
+| 8 | 1055↑ · 6.43↓ | — | 488↑ · 14.6↓ | **1131↑ · 6.60↓** | 222↑ · 12.0↓ | 1037↑ · 6.86↓ | **1640↑** · wait 36.6 svc 0.61 |
+| 16 | 1205↑ · 11.8↓ | — | 496↑ · 30.4↓ | **1128↑ · 13.5↓** | 225↑ · 14.7↓ | 1038↑ · 14.5↓ | **1665↑** · wait 73.9 svc 0.61 |
 
-**How to read D:** its fps advantage is *not* a faster pipeline — it processes 8
-frames per GPU pass. Each frame's **GPU service time is 0.61 ms** (37% cheaper
-than batch-1's 0.97 ms), but each frame **waits 6–74 ms** for its batch-mates.
-Throughput ≠ latency: D wins the first column, A2/B2 win the second.
+**How to read this table**
+
+- `fps↑ · ms↓` — two independent scores per pipeline: *throughput* and *latency*.
+  A pipeline can win one and lose the other (that is the whole Triton-vs-C++ story).
+- **D reads differently on purpose**: `1041↑ · wait 6.2 · svc 0.61` means each frame
+  **waits 6.2 ms** for its batch to fill, then the GPU **services it in 0.61 ms**
+  (8 frames share one 4.84 ms pass — 37% cheaper per frame than batch-1's 0.97 ms).
+  D's high fps is *bought with queue wait* — at conc=16 a frame waits 74 ms,
+  more than 2 camera frames at 30 FPS.
+- **Row winners**: for throughput, D ≥ A2 > B2 > C2 > B1 > C1. For latency,
+  A2 (1.23 ms) < B2 (1.28) < C2 (1.69) < D's wait (6.2-73.9). If your feed is
+  30 FPS live video, latency under 33 ms is what matters — only D at conc≥4
+  starts eating multiple frame budgets.
 
 GPU util at conc=16: A2 81% · B2 84% · C2 82% · D 79% (Triton-without-shm was 52%).
 
