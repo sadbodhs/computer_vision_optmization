@@ -1,105 +1,169 @@
-# Triton vs Pure TensorRT — Pipeline Comparison (v3: 4 optimized flows)
+# Triton vs Pure TensorRT vs DeepStream — Inference Pipeline Benchmark
 
-## Setup
-- **Hardware**: NVIDIA RTX 3090 (24 GB), driver 595.84, host Ubuntu 26.04, 16-core CPU
-- **Models**: YOLOv8n / YOLOv8s / YOLO11n — FP16 TensorRT 10.7 engines, 640×640
-  (+ `yolov8s_dyn`: dynamic-batch 1–8 engine, Triton dynamic batching, 5 ms queue)
-- **Input**: preprocessed frame replay (`frames.bin`, capacity tests bypass the 30 fps
-  source cap) + 3 RTSP streams (H.264 640×360@30, MediaMTX)
-- **Everything in Docker**; container committed as `triton-bench:full`
+One question, answered with measurements: *for the same YOLO model on the same
+GPU, which serving pipeline processes a frame fastest, and which delivers the
+most frames per second?*
 
-## The 4 optimized flows
+Hardware: RTX 3090 · Triton 24.12 · TensorRT 10.7/10.3 · DeepStream 7.1 ·
+3× YOLO FP16 engines @ 640×640 (identical ONNX, md5-verified across flows).
+Everything runs in Docker.
 
-| | Flow A2 | Flow B2 | Flow C2 | Flow D |
-|---|---|---|---|---|
-| **Stack** | C++ TRT in-proc | C++ gRPC→Triton | numpy→Triton | C++ async→Triton dyn-batch |
-| **Decode** | NVDEC **zero-copy** (CUDA hw frames) | same | ffmpeg pipe | same as B2 |
-| **Preproc** | fused CUDA kernel → **writes TRT input buffer directly** | same kernel → writes **CUDA-shm region** | **pure numpy**, no torch, no GPU | same as B2 |
-| **Transfer** | none (all GPU) | **CUDA IPC shm** | **system shm** (best; raw & cuda-shm also measured) | CUDA IPC shm |
-| **Postproc** | GPU **compact kernel** → KB of boxes to host | same | numpy NMS | same |
+---
 
-Memory chain for A2/B2/D (the zero-copy chain):
-`NVDEC NV12 (GPU) → kernel reads in place → writes TRT input / shm (GPU) → infer →
-compact kernel (GPU) → only ~KB candidate boxes cross to host`
-Only PCIe traffic: the final candidate list. One CUDA stream end-to-end.
+## 1. The contenders (naming used everywhere in this repo)
 
-## Results — capacity mode (frames replayed flat-out), total fps
+| ID | Name | Decode | Preprocess | Transport | Inference | Postprocess |
+|----|------|--------|-----------|-----------|-----------|-------------|
+| **A1** | **C++ TRT, CPU path** | NVDEC → CPU NV12 | swscale + CPU loops | none (in-proc) | TensorRT `enqueueV3` | CPU NMS |
+| **A2** | **C++ TRT, full-CUDA** | NVDEC **zero-copy** (GPU frames) | fused CUDA kernel → TRT input buffer | none (in-proc) | TensorRT, same CUDA stream | GPU compact kernel, KB of boxes to host |
+| **B1** | **Triton + C++ client** | NVDEC → CPU NV12 | swscale + CPU loops | gRPC (raw payloads) | Triton `tensorrt_plan` | CPU NMS |
+| **B2** | **Triton + C++ client + CUDA shm** | NVDEC **zero-copy** | CUDA kernel → **CUDA IPC shm region** | gRPC (handles only) | Triton `tensorrt_plan` | GPU compact kernel on shm output |
+| **C1** | Triton + Python torch *(superseded)* | ffmpeg pipe | torch GPU + H2D/D2H | gRPC raw | Triton | torch + NMS |
+| **C2** | **Triton + Python numpy + sys-shm** | ffmpeg pipe | **pure numpy** (no GPU) | **system shared memory** | Triton `tensorrt_plan` | numpy NMS, multiprocessing |
+| **D** | **Triton + async + dynamic batching** | NVDEC **zero-copy** | CUDA kernel → CUDA shm | gRPC async, 8 in-flight | Triton **batch-8 engine** | GPU compact kernel |
+| **E1** | **DeepStream, 1 stream** | `nvv4l2decoder` (NVMM) | `nvinfer` (1/255, AR, sym-pad) | none (GStreamer) | TensorRT via `nvinfer` | marcoslucianops YOLO parser |
+| **E2** | **DeepStream, N-stream batched** | same × N | `nvstreammux` batch | none (GStreamer) | TensorRT batch-N | same |
 
-| Concurrency | A1: C++ (v2) | **A2: C++ full-CUDA** | B1: C++→Triton | **B2: CUDA shm** | C old: torch | **C2: numpy+sys-shm+mp** | **D: async+dyn-batch** |
+**The zero-copy memory chain** (A2 / B2 / D): NVDEC NV12 (GPU) → kernel reads in
+place → writes TRT input / shm (GPU) → infer → compact kernel (GPU) → only ~KB of
+candidate boxes cross to host. One CUDA stream end-to-end.
+
+**Two measurement modes:**
+- **Capacity** — preprocessed frames replayed flat-out from disk. Measures what the
+  pipeline can actually do, with no camera pacing. This is where framework
+  overhead shows.
+- **RTSP end-to-end** — live 30 fps sources. Measures "can it keep up + latency",
+  bounded by the source, not the pipeline.
+
+Reference ceiling: `trtexec` on the batch-1 engine = **0.97 ms/frame, 1028 fps**;
+the batch-8 engine = 4.84 ms/8 frames = **0.61 ms/frame (1630 fps effective)**.
+
+---
+
+## 2. Capacity results — every cell shows `fps · ms-per-frame`
+
+`ms/frame` = p50 end-to-end latency for one frame at that concurrency.
+For **D** it splits into *queue wait* (batch assembly) and *GPU service*
+(4.84 ms ÷ 8 = 0.61 ms) — both shown.
+
+| Concurrency | A1 | A2 | B1 | B2 | C1 (torch) | C2 (numpy) | D (async batch-8) |
 |---|---|---|---|---|---|---|---|
-| 1 | 456 | **809** | 222 | **654** | 144 | 469 | **1041** |
-| 2 | 793 | — | 368 | **951** | 198 | 736 | 1136 |
-| 4 | 956 | — | 472 | **1092** | 218 | 986 | 1378 |
-| 8 | 1055 | — | 488 | **1131** | 222 | 1037 | **1640** |
-| 16 | 1205 | — | 496 | **1128** | 225 | 1038 | **1665** |
+| 1 | 456 · 1.32 ms | **809 · 1.23 ms** | 222 · 3.27 ms | 654 · 1.28 ms | 144 · 6.4 ms | 469 · 1.69 ms | 1041 · **6.2 ms wait** (0.61 ms svc) |
+| 2 | 793 · 1.50 ms | — | 368 · 4.03 ms | 951 · 1.83 ms | 198 · 9.6 ms | 736 · 2.20 ms | 1136 · 11.1 ms wait |
+| 4 | 956 · 3.31 ms | — | 472 · 6.90 ms | 1092 · 4.02 ms | 218 · 10.8 ms | 986 · 3.15 ms | 1378 · 19.2 ms wait |
+| 8 | 1055 · 6.43 ms | — | 488 · 14.6 ms | 1131 · 6.60 ms | 222 · 12.0 ms | 1037 · 6.86 ms | 1640 · 36.6 ms wait |
+| 16 | 1205 · 11.8 ms | — | 496 · 30.4 ms | 1128 · 13.5 ms | 225 · 14.7 ms | 1038 · 14.5 ms | 1665 · **73.9 ms wait** (0.61 ms svc) |
 
-Latency p50 @ conc=1: A2 **1.23 ms**, B2 **1.28 ms**, C2 1.69 ms (sys), D 6.3 ms
-(batching trades latency for throughput). Reference: trtexec cap 1028 qps (batch-1);
-batch-8 engine effective cap 1630 fps; 3-proc C++ 1121 fps; GPU util at high conc:
-B2 84 %, D 79 %, C2 82 % (v1 Triton best was 52 %).
+**How to read D:** its fps advantage is *not* a faster pipeline — it processes 8
+frames per GPU pass. Each frame's **GPU service time is 0.61 ms** (37% cheaper
+than batch-1's 0.97 ms), but each frame **waits 6–74 ms** for its batch-mates.
+Throughput ≠ latency: D wins the first column, A2/B2 win the second.
 
-## Transfer-variant findings (your shm questions, answered)
+GPU util at conc=16: A2 81% · B2 84% · C2 82% · D 79% (Triton-without-shm was 52%).
 
-| Variant | Python conc=1 | Why |
+---
+
+## 3. Latency-first view (live 30 FPS camera: budget = 33.3 ms/frame)
+
+| Flow | p50 | % of budget | p95 | fps @ 1 stream | fps @ 3 streams |
+|---|---|---|---|---|---|
+| A2 | **1.25 ms** | 3.8% | 1.27 ms | ~20-23 | — |
+| **E1 DeepStream** | **1.50 ms** | 4.5% | 1.59 ms | 45 | — |
+| B2 | 1.55 ms | 4.7% | 1.73 ms | ~12 | — |
+| C2 | ~2-8 ms | 6-24% | — | ~8-20 | — |
+| D | 6.2-74 ms | 19-220% | — | — | — |
+
+At 30 FPS *every* flow keeps up; the differences are in latency headroom.
+
+---
+
+## 4. Transfer-variant findings (which shared memory, and when)
+
+| Variant | Python client (CPU data) | C++ client (GPU data) | Why |
+|---|---|---|---|
+| raw gRPC | 130 fps · 7.1 ms | 222 fps · 3.3 ms | protobuf serialize + socket copies |
+| **system shm** | **469 fps · 1.69 ms** | — | server reads CPU shm directly; 2 copies gone |
+| **CUDA shm** | 330 fps · 2.47 ms | **654 fps · 1.28 ms** | zero-copy only when bytes already on GPU |
+
+- Data on GPU (C++ kernels) → **CUDA IPC shm** (3× vs raw).
+- Data on CPU (numpy) → **system shm** (3.6× vs raw); CUDA shm just moves the H2D
+  copy client-side.
+- Region management: one `cudaMalloc` + one IPC handle **per stream for its
+  lifetime** — the shm region *is* the kernel's output buffer; never allocate
+  per frame.
+
+---
+
+## 5. Multi-instance contention (N pipelines, one GPU)
+
+| N instances | A2 latency each | B2 latency each | Total fps (A2 / B2) |
+|---|---|---|---|
+| 1 | 1.24 ms | 1.28 ms | 809 / 654 |
+| 2 | 2.10 ms (+69%) | 1.86 ms (+45%) | 950 / 891 |
+| 3 | 3.13 ms (+153%) | 2.25-2.30 ms (+76%) | 957 / 985 |
+
+- Latency grows ~linearly with N; total throughput plateaus at the engine cap.
+- **Triton shares the GPU more gracefully** (+76% vs +153% at N=3): its shared
+  engine pool avoids per-process CUDA context switching.
+- C2 in-process streams: +2-3% latency at N=3 (threads share one connection).
+
+---
+
+## 6. DeepStream (E) — NVIDIA's integrated stack, same weights
+
+Same ONNX (md5-verified), engines rebuilt in-container (TRT 10.3; trtexec parity
+1030 vs 1028 qps — negligible). `nvv4l2decoder → nvstreammux → nvinfer → parser`.
+
+| Config | Total fps | fps/stream | p50 | GPU util | Reading |
+|---|---|---|---|---|---|
+| E1: 1 stream (RTSP 30fps) | 45 | 45 | **1.50 ms** | — | decode+infer+parse, no RPC |
+| E2: 3 streams | 104 | 34.5 | 3.1 ms | — | batch=3 assembles fast |
+| E2: 6 streams | 169 | 28 | 32.5 ms | — | batch wait dominates |
+| E2: 8 streams | 226 | 28 | 32.7 ms | **5.4%** | source-bound: 240fps demand, 94% delivered |
+
+E2's 33 ms p50 is the **streammux batch-assembly wait** (batch of 8 fills every
+~33 ms at 30 fps sources), not inference. E2 is source-bound — its capacity-mode
+sweep (file replay) is future work to compare against D directly.
+
+---
+
+## 7. Decision guide
+
+| Scenario | Pick | Why |
 |---|---|---|
-| raw gRPC | 130 fps / 7.1 ms | protobuf serialize + socket copies dominate |
-| **system shm** | **469 fps / 1.69 ms** | server reads CPU shm directly; 2 copies eliminated |
-| CUDA shm | 330 fps / 2.47 ms | H2D copy just moves client-side — no win for CPU data |
+| Live camera, lowest latency, full control | **A2** | 1.23 ms, no dependencies |
+| Live multi-stream, want a server | **B2** | 1.28 ms + Triton ops (reload, metrics) |
+| Python-only team | **C2** | 1038 fps; numpy + sys-shm + processes |
+| Offline / max throughput / many users | **D** | 0.61 ms/frame GPU cost; latency negotiable |
+| Edge product, NVIDIA-supported stack | **E** | 1.5 ms single, batched multi-stream, zero custom code |
 
-- **CUDA shm wins when data is already on GPU** (flows B2/D: kernel output goes
-  straight into the IPC region — 654 fps vs 222 raw = **3×**).
-- **System shm wins when data is on CPU** (flow C2: Python/numpy). Your guess was
-  right for the C++ flows; for the numpy flow system shm is the best fit.
-- "Same memory location" management: B2's shm region IS the kernel's destination
-  buffer (one `cudaMalloc`, one IPC handle, reused every frame — no per-frame alloc).
+---
 
-## Key findings
-
-1. **Full-CUDA preprocessing pays**: A2 file-mode 809 fps @ conc1 (p50 1.23 ms) vs
-   A1 456 (1.32) — GPU compact kernel removes the 2.8 MB D2H + CPU 8400×80 scan.
-   RTSP mode: A2 1.25 ms p50 for decode→pre→infer→post (zero-copy chain works).
-2. **CUDA shm through Triton ≈ in-process TRT**: B2 654–1131 fps; Triton server
-   overhead is now only ~0.1 ms per request at conc=1 (1.28 vs 1.23 in-process).
-3. **Python is no longer the bottleneck when done right**: numpy+sys-shm+mp reaches
-   1038 fps (was 225 with torch+threads). GIL + gRPC serialization were the killers.
-4. **Dynamic batching needs async in-flight clients**: sync clients never co-arrive
-   (D-sync ≤ B-sync in v2), but async depth-8 clients fill batch-8 → **1665 fps @
-   conc16 — the highest of any arm**, at the cost of higher p50 latency (73 ms)
-   because requests wait for batch-mates. Latency-sensitive streams should use B2.
-5. **RTSP E2E remains decode-bound** (~30 fps source): A2 23 fps, B2 ~12 fps
-   (variance from stream jitter) — inference is never the constraint in live mode.
-
-## Best technique per flow (the answer)
-
-- **Flow A2** (custom, no server): NVDEC zero-copy + fused CUDA kernel + GPU compact.
-  Best latency (1.23 ms) and best single-stream throughput (809).
-- **Flow B2** (Triton, low latency): CUDA shm + GPU preprocess. Near-in-process
-  performance (654–1131 fps, 1.28 ms) with Triton's operational benefits.
-- **Flow C2** (Python, Triton): numpy + system shm + multiprocessing. 4.6× the old
-  Python client at saturation; sys-shm is the right shm for CPU-side preprocessing.
-- **Flow D** (batched Triton): async in-flight + dynamic batching. Absolute best
-  total throughput (1665 fps) when latency is negotiable.
-
-## Reproduce
+## 8. Reproduce
 
 ```bash
-docker restart triton-server   # image triton-bench:full
-cd /home/suchi/sadbodh/rt_vs_triton
-# A2
+docker restart triton-server        # image triton-bench:v3 (Triton arm)
+# A2: C++ full-CUDA
 docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_pipeline_cuda --engine model.plan --mode file --file frames.bin --streams 1 --duration 10'
-# B2 (CUDA shm)
+# B2: Triton + CUDA shm
 docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_grpc_cuda --mode file --file frames.bin --model yolov8s --streams 1 --duration 10'
-# C2 (numpy + sys shm + processes)
+# C2: Python numpy + sys-shm + processes
 docker exec triton-server bash -c 'cd /work && python3 client_v2.py --mode file --file cpp/build/frames.bin --model yolov8s --transfer sys --streams 4 --processes 4 --duration 8'
-# D (async + dynamic batch)
+# D: async + dynamic batching
 docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_grpc_async --model yolov8s_dyn --file frames.bin --streams 8 --duration 10'
+# E: DeepStream (ds-build container)
+docker exec ds-build bash -c 'cd /tmp && ./ds_bench --config /opt/ds/model/yolov8s/config_infer_primary_yolov8s.txt --streams 1 --batch 1 --duration 15'
 ```
 
-## Artifacts
-- `cpp/src/main_cuda.cu` — Flow A2 (NVDEC zero-copy + fused kernel + compact)
-- `cpp/src/grpc_client_cuda.cu` — Flow B2 (CUDA IPC shm → Triton)
-- `cpp/src/grpc_async_client.cu` — Flow D (async in-flight + dyn batch + CUDA shm)
-- `triton/client_v2.py` — Flow C2 (numpy; `--transfer raw|sys|cuda`, `--processes N`)
-- `triton/models/` — FP16 engines + `yolov8s_dyn`
-- `results/` — raw data (`v2/` = A1/B1/C/D-sync, `v3/` = GPU samples)
-- Image `triton-bench:full` — provisioned environment
+Engines are gitignored — regenerate from the same ONNX (ultralytics export →
+`trtexec --fp16`) or pull the committed container images.
+
+## 9. Artifacts
+
+- `cpp/src/main_cuda.cu` — A2 · `cpp/src/main.cpp` — A1
+- `cpp/src/grpc_client_cuda.cu` — B2/D(sync) · `cpp/src/grpc_client.cpp` — B1
+- `cpp/src/grpc_async_client.cu` — D (async, 8 in-flight)
+- `cpp/src/ds_bench.cpp` — E1/E2 (DeepStream, RTSP + file modes)
+- `triton/client_v2.py` — C2 (+ `--transfer raw|sys|cuda`)
+- `triton/models/` — Triton configs · `results/` — raw data + `comparison_tables.md` + `parallel_contention.md`
+- Images: `triton-bench:v3`, `ds-build` (DeepStream + YOLO parser)

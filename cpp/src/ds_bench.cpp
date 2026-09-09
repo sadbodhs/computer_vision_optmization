@@ -8,6 +8,7 @@
 //     -lnvdsinfer -lnvds_meta -Wl,-rpath,/opt/nvidia/deepstream/deepstream/lib
 
 #include <gst/gst.h>
+#include <gst/app/gstappsrc.h>
 #include <gstnvdsmeta.h>
 #include <nvdsinfer.h>
 
@@ -20,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <fstream>
 #include <vector>
 
 typedef struct {
@@ -115,7 +117,38 @@ static gboolean timer_cb(gpointer) {
   return TRUE;
 }
 
-// per-source pad-added context
+// ---------------- file (capacity) mode: appsrc feeding NV12 frames ----------------
+static std::vector<unsigned char> g_nv12;   // N frames concatenated
+static size_t g_nv12_frame_size = 0;
+static bool g_file_mode = false;
+static std::string g_file_path;
+static std::vector<GstElement *> g_appsrcs;
+static std::atomic<bool> g_push_run{false};
+
+static void push_thread_fn(int sid, int n_frames, GstElement *appsrc) {
+  size_t fi = 0;
+  while (g_push_run.load()) {
+    GstBuffer *buf = gst_buffer_new_and_alloc(g_nv12_frame_size);
+    gst_buffer_fill(buf, 0, g_nv12.data() + fi * g_nv12_frame_size, g_nv12_frame_size);
+    if (gst_app_src_push_buffer((GstAppSrc *)appsrc, buf) != GST_FLOW_OK) break;
+    fi = (fi + 1) % n_frames;
+  }
+}
+
+static gboolean stop_push_cb(gpointer) {
+  g_push_run.store(false);
+  return FALSE;
+}
+
+static long g_mux_out = 0;
+static GstPadProbeReturn mux_probe(GstPad *, GstPadProbeInfo *info, gpointer) {
+  if (info->type & GST_PAD_PROBE_TYPE_BUFFER) {
+    __sync_fetch_and_add(&g_mux_out, 1);
+    if (g_mux_out == 1) g_print("first mux buffer out\n");
+  }
+  return GST_PAD_PROBE_OK;
+}
+
 typedef struct { int sid; GstElement *depay; } SrcCtx;
 
 int main(int argc, char *argv[]) {
@@ -128,6 +161,10 @@ int main(int argc, char *argv[]) {
     else if (!strcmp(argv[i], "--streams") && i + 1 < argc) n_streams = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--batch") && i + 1 < argc) batch_size = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--duration") && i + 1 < argc) duration = atof(argv[++i]);
+    else if (!strcmp(argv[i], "--mode") && i + 1 < argc) {
+      if (!strcmp(argv[++i], "file")) g_file_mode = true;
+    }
+    else if (!strcmp(argv[i], "--file") && i + 1 < argc) g_file_path = argv[++i];
   }
   if (batch_size < n_streams) batch_size = n_streams;
 
@@ -155,9 +192,48 @@ int main(int argc, char *argv[]) {
   GstPad *ipad = gst_element_get_static_pad(C.infer, "src");
   gst_pad_add_probe(ipad, (GstPadProbeType)(GST_PAD_PROBE_TYPE_BUFFER), infer_probe, NULL, NULL);
   gst_object_unref(ipad);
+  // mux src probe (diagnose file-mode stalls)
+  GstPad *mpad = gst_element_get_static_pad(C.mux, "src");
+  gst_pad_add_probe(mpad, (GstPadProbeType)(GST_PAD_PROBE_TYPE_BUFFER), mux_probe, NULL, NULL);
+  gst_object_unref(mpad);
 
   std::vector<SrcCtx *> sctxs;
+  std::vector<std::thread> push_threads;
   for (int i = 0; i < n_streams; ++i) {
+    if (g_file_mode) {
+      // capacity mode: appsrc pushes NV12 frames from file, no decode
+      char name[32];
+      snprintf(name, sizeof(name), "asrc%d", i);
+      GstElement *asrc = gst_element_factory_make("appsrc", name);
+      GstCaps *acaps = gst_caps_from_string(
+          "video/x-raw,format=NV12,width=640,height=360,framerate=30/1");
+      g_object_set(asrc, "caps", acaps, "format", GST_FORMAT_TIME,
+                   "is-live", TRUE, "block", TRUE, "do-timestamp", TRUE, NULL);
+      gst_caps_unref(acaps);
+      gst_bin_add(GST_BIN(C.pipeline), asrc);
+      g_appsrcs.push_back(asrc);
+      // appsrc -> nvvideoconvert (sysmem->NVMM) -> capsfilter(NVMM NV12) -> mux
+      GstElement *conv = gst_element_factory_make("nvvideoconvert", NULL);
+      GstElement *cf = gst_element_factory_make("capsfilter", NULL);
+      GstCaps *ccaps = gst_caps_from_string(
+          "video/x-raw(memory:NVMM),format=NV12,width=640,height=360");
+      g_object_set(cf, "caps", ccaps, NULL);
+      gst_caps_unref(ccaps);
+      gst_bin_add_many(GST_BIN(C.pipeline), conv, cf, NULL);
+      if (!gst_element_link_many(asrc, conv, cf, NULL)) { g_printerr("appsrc->conv link failed\n"); return 1; }
+      GstPad *csrc = gst_element_get_static_pad(cf, "src");
+      char padname[32];
+      snprintf(padname, sizeof(padname), "sink_%u", i);
+      GstPad *mux_sink = gst_element_get_static_pad(C.mux, padname);
+      if (!mux_sink) mux_sink = gst_element_request_pad_simple(C.mux, padname);
+      if (gst_pad_link(csrc, mux_sink) != GST_PAD_LINK_OK) {
+        g_printerr("appsrc->mux link failed for stream %d\n", i);
+        return 1;
+      }
+      gst_object_unref(mux_sink);
+      gst_object_unref(csrc);
+      continue;
+    }
     char uri[128], name[32];
     snprintf(uri, sizeof(uri), "rtsp://localhost:8554/cam%d", i + 1);
     snprintf(name, sizeof(name), "src%d", i);
@@ -215,8 +291,29 @@ int main(int argc, char *argv[]) {
   g_timeout_add(1000, timer_cb, NULL);
   gst_element_set_state(C.pipeline, GST_STATE_PLAYING);
   g_print("Pipeline playing: %d streams, batch=%d\n", n_streams, batch_size);
+
+  // file mode: load frames and start push threads after state settles
+  if (g_file_mode) {
+    std::ifstream f(g_file_path, std::ios::binary);
+    f.seekg(0, std::ios::end);
+    size_t sz = f.tellg();
+    f.seekg(0, std::ios::beg);
+    g_nv12_frame_size = 640 * 360 * 3 / 2;  // NV12 640x360
+    size_t n_frames = sz / g_nv12_frame_size;
+    g_nv12.resize(sz);
+    f.read(reinterpret_cast<char *>(g_nv12.data()), sz);
+    g_print("file mode: %zu NV12 frames (%zu bytes each)\n", n_frames, g_nv12_frame_size);
+    // wait for pipeline to reach PLAYING before pushing
+    gst_element_get_state(C.pipeline, NULL, NULL, 10 * GST_SECOND);
+    g_push_run.store(true);
+    for (int i = 0; i < n_streams; ++i)
+      push_threads.emplace_back(push_thread_fn, i, (int)n_frames, g_appsrcs[i]);
+  }
+
   g_main_loop_run(C.loop);
 
+  g_push_run.store(false);
+  for (auto &t : push_threads) if (t.joinable()) t.join();
   gst_element_set_state(C.pipeline, GST_STATE_NULL);
   double el = now_s() - std::chrono::duration<double>(C.t0.time_since_epoch()).count();
   long n = C.frames.load();
