@@ -1,0 +1,3 @@
+{"pipeline":"cpp_trt","streams":1,"frames":445,"detections":115,"fps":29.6667,"latency_ms_est":33.7079}
+{"pipeline":"cpp_trt","streams":1,"frames":461,"detections":722,"fps":30.7333,"latency_ms_est":32.538}
+{"pipeline":"cpp_trt","streams":1,"frames":449,"detections":468,"fps":29.9333,"latency_ms_est":33.4076}

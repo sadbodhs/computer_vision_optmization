@@ -1,0 +1,83 @@
+=== Benchmark v2.1: duration=10s repeats=3 ===
+[trtexec_yolov8n] cap_qps=
+[trtexec_yolov8s] cap_qps=
+[trtexec_yolo11n] cap_qps=
+[A_cap_s1 r1] 
+[A_cap_s1 r2] 
+[A_cap_s1 r3] 
+[B_cap_s1 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":1,"frames":2217,"detections":4157,"fps":221.70,"lat_ms_p50":3.273,"lat_ms_p95":3.674,"lat_ms_p99":3.881}
+[B_cap_s1 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":1,"frames":2231,"detections":4183,"fps":223.10,"lat_ms_p50":3.263,"lat_ms_p95":3.483,"lat_ms_p99":3.769}
+[B_cap_s1 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":1,"frames":2249,"detections":4217,"fps":224.90,"lat_ms_p50":3.242,"lat_ms_p95":3.480,"lat_ms_p99":3.724}
+[C_cap_s1 r1] {"pipeline": "triton_python", "mode": "file", "streams": 1, "frames": 1442, "detections": 2703, "fps": 144.2, "per_stream_fps": [144.2], "lat_ms_p50": 6.41, "lat_ms_p95": 7.93}
+[C_cap_s1 r2] {"pipeline": "triton_python", "mode": "file", "streams": 1, "frames": 1501, "detections": 2815, "fps": 150.1, "per_stream_fps": [150.1], "lat_ms_p50": 6.36, "lat_ms_p95": 7.94}
+[C_cap_s1 r3] {"pipeline": "triton_python", "mode": "file", "streams": 1, "frames": 1521, "detections": 2852, "fps": 152.1, "per_stream_fps": [152.0], "lat_ms_p50": 6.23, "lat_ms_p95": 7.8}
+[D_cap_s1 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":1,"frames":935,"detections":1753,"fps":93.50,"lat_ms_p50":9.094,"lat_ms_p95":9.423,"lat_ms_p99":9.647}
+[D_cap_s1 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":1,"frames":926,"detections":1737,"fps":92.60,"lat_ms_p50":9.173,"lat_ms_p95":9.472,"lat_ms_p99":9.807}
+[D_cap_s1 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":1,"frames":931,"detections":1745,"fps":93.10,"lat_ms_p50":9.144,"lat_ms_p95":9.422,"lat_ms_p99":9.656}
+[A_cap_s2 r1] 
+[A_cap_s2 r2] 
+[A_cap_s2 r3] 
+[B_cap_s2 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":2,"frames":3673,"detections":6888,"fps":367.30,"lat_ms_p50":4.079,"lat_ms_p95":4.944,"lat_ms_p99":5.277}
+[B_cap_s2 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":2,"frames":3698,"detections":6934,"fps":369.80,"lat_ms_p50":4.028,"lat_ms_p95":4.918,"lat_ms_p99":5.301}
+[B_cap_s2 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":2,"frames":3696,"detections":6930,"fps":369.60,"lat_ms_p50":4.035,"lat_ms_p95":4.914,"lat_ms_p99":5.255}
+[C_cap_s2 r1] {"pipeline": "triton_python", "mode": "file", "streams": 2, "frames": 1977, "detections": 3708, "fps": 197.7, "per_stream_fps": [98.8, 98.8], "lat_ms_p50": 9.56, "lat_ms_p95": 11.13}
+[C_cap_s2 r2] {"pipeline": "triton_python", "mode": "file", "streams": 2, "frames": 1976, "detections": 3706, "fps": 197.6, "per_stream_fps": [98.8, 98.7], "lat_ms_p50": 9.55, "lat_ms_p95": 11.17}
+[C_cap_s2 r3] {"pipeline": "triton_python", "mode": "file", "streams": 2, "frames": 1964, "detections": 3682, "fps": 196.4, "per_stream_fps": [98.1, 98.2], "lat_ms_p50": 9.65, "lat_ms_p95": 11.23}
+[D_cap_s2 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":2,"frames":1616,"detections":3030,"fps":161.60,"lat_ms_p50":10.764,"lat_ms_p95":11.511,"lat_ms_p99":12.095}
+[D_cap_s2 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":2,"frames":1608,"detections":3014,"fps":160.80,"lat_ms_p50":10.830,"lat_ms_p95":11.533,"lat_ms_p99":12.033}
+[D_cap_s2 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":2,"frames":1614,"detections":3026,"fps":161.40,"lat_ms_p50":10.748,"lat_ms_p95":11.475,"lat_ms_p99":12.234}
+[A_cap_s4 r1] 
+[A_cap_s4 r2] 
+[A_cap_s4 r3] 
+[B_cap_s4 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":4,"frames":4719,"detections":8848,"fps":471.90,"lat_ms_p50":6.897,"lat_ms_p95":8.921,"lat_ms_p99":9.861}
+[B_cap_s4 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":4,"frames":4692,"detections":8799,"fps":469.20,"lat_ms_p50":6.982,"lat_ms_p95":9.024,"lat_ms_p99":9.960}
+[B_cap_s4 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":4,"frames":4778,"detections":8958,"fps":477.80,"lat_ms_p50":6.821,"lat_ms_p95":8.572,"lat_ms_p99":9.447}
+[C_cap_s4 r1] {"pipeline": "triton_python", "mode": "file", "streams": 4, "frames": 2187, "detections": 4100, "fps": 218.7, "per_stream_fps": [54.6, 54.3, 54.3, 55.3], "lat_ms_p50": 10.83, "lat_ms_p95": 17.69}
+[C_cap_s4 r2] {"pipeline": "triton_python", "mode": "file", "streams": 4, "frames": 2180, "detections": 4088, "fps": 218.0, "per_stream_fps": [54.3, 54.0, 55.3, 54.3], "lat_ms_p50": 10.94, "lat_ms_p95": 17.75}
+[C_cap_s4 r3] {"pipeline": "triton_python", "mode": "file", "streams": 4, "frames": 2178, "detections": 4085, "fps": 217.8, "per_stream_fps": [54.9, 54.2, 54.3, 54.1], "lat_ms_p50": 11.4, "lat_ms_p95": 17.73}
+[D_cap_s4 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":4,"frames":3120,"detections":5852,"fps":312.00,"lat_ms_p50":11.073,"lat_ms_p95":12.306,"lat_ms_p99":13.559}
+[D_cap_s4 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":4,"frames":2872,"detections":5388,"fps":287.20,"lat_ms_p50":12.307,"lat_ms_p95":13.892,"lat_ms_p99":14.704}
+[D_cap_s4 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":4,"frames":2932,"detections":5500,"fps":293.20,"lat_ms_p50":11.921,"lat_ms_p95":13.689,"lat_ms_p99":14.446}
+[A_cap_s8 r1] 
+[A_cap_s8 r2] 
+[A_cap_s8 r3] 
+[B_cap_s8 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":8,"frames":4882,"detections":9153,"fps":488.20,"lat_ms_p50":14.565,"lat_ms_p95":18.557,"lat_ms_p99":20.719}
+[B_cap_s8 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":8,"frames":4888,"detections":9166,"fps":488.80,"lat_ms_p50":14.559,"lat_ms_p95":18.595,"lat_ms_p99":20.500}
+[B_cap_s8 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":8,"frames":4872,"detections":9135,"fps":487.20,"lat_ms_p50":14.618,"lat_ms_p95":18.503,"lat_ms_p99":20.560}
+[C_cap_s8 r1] {"pipeline": "triton_python", "mode": "file", "streams": 8, "frames": 2182, "detections": 4090, "fps": 218.2, "per_stream_fps": [27.3, 27.3, 27.1, 27.5, 27.2, 27.4, 27.2, 27.2], "lat_ms_p50": 12.04, "lat_ms_p95": 21.86}
+[C_cap_s8 r2] {"pipeline": "triton_python", "mode": "file", "streams": 8, "frames": 2221, "detections": 4161, "fps": 222.1, "per_stream_fps": [28.7, 27.6, 27.7, 27.6, 27.6, 27.5, 27.7, 27.7], "lat_ms_p50": 13.77, "lat_ms_p95": 23.48}
+[C_cap_s8 r3] {"pipeline": "triton_python", "mode": "file", "streams": 8, "frames": 2181, "detections": 4089, "fps": 218.1, "per_stream_fps": [27.2, 27.5, 27.2, 27.3, 27.2, 27.3, 27.1, 27.3], "lat_ms_p50": 13.37, "lat_ms_p95": 22.35}
+[D_cap_s8 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":8,"frames":4610,"detections":8644,"fps":461.00,"lat_ms_p50":15.634,"lat_ms_p95":19.177,"lat_ms_p99":21.815}
+[D_cap_s8 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":8,"frames":4551,"detections":8532,"fps":455.10,"lat_ms_p50":15.882,"lat_ms_p95":19.460,"lat_ms_p99":21.708}
+[D_cap_s8 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":8,"frames":4678,"detections":8772,"fps":467.80,"lat_ms_p50":15.281,"lat_ms_p95":18.912,"lat_ms_p99":21.674}
+[A_cap_s16 r1] 
+[A_cap_s16 r2] 
+[A_cap_s16 r3] 
+[B_cap_s16 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":16,"frames":4967,"detections":9310,"fps":496.70,"lat_ms_p50":30.438,"lat_ms_p95":33.385,"lat_ms_p99":34.843}
+[B_cap_s16 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":16,"frames":4953,"detections":9282,"fps":495.30,"lat_ms_p50":30.534,"lat_ms_p95":33.427,"lat_ms_p99":35.243}
+[B_cap_s16 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s","streams":16,"frames":4973,"detections":9322,"fps":497.30,"lat_ms_p50":30.408,"lat_ms_p95":33.243,"lat_ms_p99":34.958}
+[C_cap_s16 r1] {"pipeline": "triton_python", "mode": "file", "streams": 16, "frames": 2257, "detections": 4240, "fps": 225.7, "per_stream_fps": [14.1, 14.1, 14.0, 14.0, 14.2, 14.0, 14.0, 14.0, 14.0, 14.0, 14.0, 13.9, 14.2, 14.2, 14.5, 14.5], "lat_ms_p50": 14.66, "lat_ms_p95": 28.95}
+[C_cap_s16 r2] {"pipeline": "triton_python", "mode": "file", "streams": 16, "frames": 2273, "detections": 4270, "fps": 227.3, "per_stream_fps": [14.2, 14.2, 14.2, 14.2, 14.2, 14.1, 14.1, 14.1, 14.1, 14.1, 14.2, 14.1, 14.1, 14.3, 14.3, 14.8], "lat_ms_p50": 14.63, "lat_ms_p95": 24.24}
+[C_cap_s16 r3] {"pipeline": "triton_python", "mode": "file", "streams": 16, "frames": 2229, "detections": 4184, "fps": 222.9, "per_stream_fps": [13.9, 13.9, 13.9, 14.0, 13.9, 13.9, 13.9, 13.8, 13.8, 13.8, 13.8, 13.9, 13.9, 13.9, 14.0, 14.6], "lat_ms_p50": 15.03, "lat_ms_p95": 35.24}
+[D_cap_s16 r1] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":16,"frames":4498,"detections":8431,"fps":449.80,"lat_ms_p50":33.127,"lat_ms_p95":44.289,"lat_ms_p99":50.897}
+[D_cap_s16 r2] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":16,"frames":4640,"detections":8704,"fps":464.00,"lat_ms_p50":32.021,"lat_ms_p95":42.645,"lat_ms_p99":47.600}
+[D_cap_s16 r3] {"pipeline":"cpp_grpc_triton","mode":"file","model":"yolov8s_dyn","streams":16,"frames":4683,"detections":8781,"fps":468.30,"lat_ms_p50":31.990,"lat_ms_p95":41.331,"lat_ms_p99":46.415}
+[A3proc_cap r1] 
+[A3proc_cap r2] 
+[A3proc_cap r3] 
+[A_rtsp r1] 
+[A_rtsp r2] 
+[A_rtsp r3] 
+[B_rtsp r1] {"pipeline":"cpp_grpc_triton","mode":"rtsp","model":"yolov8s","streams":1,"frames":0,"detections":0,"fps":0.00,"lat_ms_p50":0.000,"lat_ms_p95":0.000,"lat_ms_p99":0.000}
+[B_rtsp r2] {"pipeline":"cpp_grpc_triton","mode":"rtsp","model":"yolov8s","streams":1,"frames":0,"detections":0,"fps":0.00,"lat_ms_p50":0.000,"lat_ms_p95":0.000,"lat_ms_p99":0.000}
+[B_rtsp r3] {"pipeline":"cpp_grpc_triton","mode":"rtsp","model":"yolov8s","streams":1,"frames":0,"detections":0,"fps":0.00,"lat_ms_p50":0.000,"lat_ms_p95":0.000,"lat_ms_p99":0.000}
+[C_rtsp r1] {"pipeline": "triton_python", "mode": "rtsp", "streams": 1, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[C_rtsp r2] {"pipeline": "triton_python", "mode": "rtsp", "streams": 1, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[C_rtsp r3] {"pipeline": "triton_python", "mode": "rtsp", "streams": 1, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[C_rtsp3 r1] {"pipeline": "triton_python", "mode": "rtsp", "streams": 3, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0, 0.0, 0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[C_rtsp3 r2] {"pipeline": "triton_python", "mode": "rtsp", "streams": 3, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0, 0.0, 0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[C_rtsp3 r3] {"pipeline": "triton_python", "mode": "rtsp", "streams": 3, "frames": 0, "detections": 0, "fps": 0.0, "per_stream_fps": [0.0, 0.0, 0.0], "lat_ms_p50": 0, "lat_ms_p95": 0}
+[A3proc_rtsp r1] 
+[A3proc_rtsp r2] 
+[A3proc_rtsp r3] 
+=== saved to /home/suchi/sadbodh/rt_vs_triton/results/v2/all_20260908_143341.tsv ===

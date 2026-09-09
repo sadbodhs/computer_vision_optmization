@@ -1,0 +1,14 @@
+# Model binaries (regenerate via scripts + export commands in README)
+*.plan
+*.engine
+*.onnx
+*.pt
+*.bin
+
+# Videos (generate with ffmpeg testsrc2 or download samples)
+videos/
+
+# Misc
+__pycache__/
+*.pyc
+core
