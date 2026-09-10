@@ -13,6 +13,7 @@ What each file is, and how it maps to the tables in the top-level README/STORY.
 | `v2/gpu_*.csv`, `gpu_*.csv`, `v3/gpu_*.csv` | v2/v3 | GPU util/mem samples (`scripts/gpu_sample.sh`) taken during runs. |
 | `comparison_tables.md` | v2 | The fair tables (per-frame latency, per-frame GPU cost) + Flow E (DeepStream). |
 | `parallel_contention.md` | v3 | Multi-instance contention study (`scripts/parallel_test.sh`). |
+| `v3/cuda_graphs.tsv` | v3 | CUDA Graphs A/B across all three engines (`scripts/cuda_graphs.sh`), 3 repeats per cell. |
 | `v3/mps_contention_N3.tsv` | v3 | CUDA MPS A/B for A2 at N=3 (`scripts/mps_contention.sh`), 3 repeats per condition. MPS off ~960 fps / 3.115 ms; MPS on ~1266 fps / 2.476 ms. |
 
 ## Reading the v2 TSVs (important)

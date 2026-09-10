@@ -49,15 +49,19 @@ the retraining is even worth it.
 
 ## Tier 2 — levers that would move numbers already published
 
-### CUDA Graphs
+### CUDA Graphs — ✅ measured at engine level
 
-A2's overhead is **0.26 ms** on top of a 0.97 ms engine
-([stage decomposition](stage-decomposition.md)); a meaningful share of that is
-per-launch CPU cost, which CUDA graphs exist to amortize. Supported:
-`trtexec --useCudaGraph`; Triton exposes it per model config.
+Done: [CUDA graphs](cuda-graphs.md). `--useCudaGraph` gives **+23.2% (YOLOv8n),
++14.9% (YOLOv8s), +27.0% (YOLO11n)** — a roughly constant **~0.13 ms** of
+per-iteration launch overhead removed, which is why the percentage is larger for
+cheaper models. The published 0.97 ms ceiling is therefore launch-bound, not a
+hardware floor.
 
-*Why it matters here*: this attacks the **headline** A2 latency directly, and
-Triton's equivalent would narrow B2's remaining gap.
+**Still open:** no pipeline binary uses graphs. Capturing the infer + compact
+kernel into a graph inside `main_cuda.cu` is an unmade code change; ~0.13 ms is
+the projected headroom for A2, not a measurement. Triton's own
+`optimization { cuda { graphs: true } }` is also untested for B2/D, and
+fixed-shape capture complicates the dynamic-batch engines used by D.
 
 ### CUDA MPS — ✅ measured (A2), partially open (B2)
 

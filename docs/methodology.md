@@ -39,6 +39,12 @@ Also measured: YOLOv8n **1490 qps** · YOLO11n **1259 qps**.
 Everything in this study is the story of what stands between your camera and
 that 0.97 ms.
 
+> **Caveat added after the fact:** ~0.13 ms of that 0.97 ms is CPU-side kernel
+> *launch* overhead, not GPU compute — with CUDA Graphs the same engine runs at
+> 0.86 ms / 1166 qps. 0.97 ms is the right baseline for this study (every flow
+> here launches per frame) but it is not a hardware floor. See
+> [CUDA graphs](cuda-graphs.md).
+
 ## How to read the tables
 
 Two independent scores per pipeline: *throughput* and *latency*. A pipeline can

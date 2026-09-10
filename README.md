@@ -25,7 +25,8 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
 | [DeepStream](docs/deepstream.md) | What does NVIDIA's own stack do? | 1.50 ms/frame, zero custom code, source-bound at 5.4% GPU |
 | [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
-| [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8, no MPS, no CUDA graphs — yet |
+| [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
+| [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8; MPS and CUDA graphs now measured |
 
 **Two reading paths.** Start-to-finish: STORY → Methodology → Results → the four
 analysis docs. Or jump straight to the row above that matches your question.
@@ -114,6 +115,6 @@ Details, per-arm commands, and the source→binary map: [Reproduce](docs/reprodu
 
 This study covers the **serving and transport layer**, at FP16, at 640×640, for
 detection on a single GPU. It has **no accuracy (mAP) axis**, and does not yet
-cover INT8, sparsity, CUDA graphs, MPS, in-graph NMS, input-resolution scaling, or
-application-level tricks like detect-and-track. Those limits are enumerated
+cover INT8, sparsity, in-graph NMS, input-resolution scaling, or application-level
+tricks like detect-and-track (MPS and CUDA graphs have since been measured). Those limits are enumerated
 honestly in the [Roadmap](docs/roadmap.md).
