@@ -51,8 +51,11 @@ only because the same fixed cost is a larger share of a cheaper model's budget.
   kernel into a graph and replaying it, which is a code change that has **not**
   been made or measured. A2's engine stage measures ~0.98 ms, so ~0.13 ms is the
   plausible headroom — a *projection from this table, not a measurement*.
-- **Triton's own CUDA-graph support is untested.** Triton can capture graphs per
-  model (`optimization { cuda { graphs: true } }`); B2/D were never run with it.
+- **Triton's own CUDA-graph support: now measured** — see
+  [Triton tuning](triton-tuning.md). Short version: the engine-level gain arrives
+  intact at `instance_group count: 1` (+13.6%) but is mostly gone at `count: 2`
+  (+3.1%), because multiple instances already hide the launch overhead that graphs
+  remove. The p95 tail improvement survives regardless.
 - **Graphs constrain shape changes.** A captured graph is fixed-shape; the
   dynamic-batch `_dyn` engines used by flow D would need one graph per batch size.
   Not explored here.

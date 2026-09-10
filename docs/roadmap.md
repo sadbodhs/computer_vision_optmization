@@ -87,12 +87,18 @@ it. Folding NMS into the engine collapses that to a few KB at the source.
 would change the [transport](transport.md) conclusions — the copy you cannot
 eliminate is the one you never make.
 
-### Triton knobs never swept
+### Triton knobs — ✅ partly swept
 
-`instance_group count` was fixed at 2 throughout and never justified.
-`preferred_batch_size` and `max_queue_delay_microseconds` were fixed at
-`[4,8]`/5000. Also untouched: model warmup, response cache, rate limiter, priority
-levels, and NVIDIA's own **Model Analyzer**, which automates exactly this sweep.
+Done for `instance_group count` and CUDA graphs: [Triton tuning](triton-tuning.md).
+`count: 2` is validated (+30.4% over 1; 4 adds only +2.3%), and server-side CUDA
+graphs turn out to be a *substitute* for multiple instances rather than an
+addition — +13.6% at `count: 1`, +3.1% at `count: 2`. `count: 4` + graphs fails
+graph capture and takes the server down.
+
+**Still untouched:** `preferred_batch_size`, `max_queue_delay_microseconds`, model
+warmup, response cache, rate limiter, priority levels, and NVIDIA's Model
+Analyzer. Flow D's dynamic-batch engines also need per-batch-size graph capture
+(`graph_spec`), untested.
 
 ### DeepStream E2 in capacity mode
 
