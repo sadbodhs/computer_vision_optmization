@@ -139,7 +139,26 @@ sweep (file replay) is future work to compare against D directly.
 
 ---
 
-## 7. Decision guide
+## 7. Triton at its absolute best (zero-copy + async + batching, all 3 models)
+
+D's stack (CUDA shm + async in-flight + batch-8 engines) is "B2 with dynamic
+batching". Run across **all three models concurrently** — Triton's real
+production scenario, where its scheduler has no hand-rolled equivalent:
+
+| Scenario | Total fps | Latency p50 | vs hand-rolled best |
+|---|---|---|---|
+| D: 1 model (yolov8s), conc=16 | 1665 | 73.9 ms wait | +38% vs A2 (1205) |
+| **D: 3 models × 6 streams each** | **1799** | 29.4 ms | +49% vs A2 |
+| **D: 3 models × 6 streams (conc=18)** | **1816** | 58.6 ms | +51% vs A2 |
+| D: yolov8n alone, conc=8 | 1988 | 24.1 ms | engine cap 2960 effective |
+
+**This is the answer to "shouldn't Triton win?"**: yes — when fed properly
+(CUDA shm zero-copy, async clients keeping batches full), Triton **beats the
+hand-rolled C++ pipeline by ~50% on throughput**. The same server with naive
+clients (C1: 225 fps) loses 8×. Triton's framework is only as good as its
+client; its scheduler is the irreplaceable part.
+
+## 8. Decision guide
 
 | Scenario | Pick | Why |
 |---|---|---|
@@ -147,11 +166,12 @@ sweep (file replay) is future work to compare against D directly.
 | Live multi-stream, want a server | **B2** | 1.28 ms + Triton ops (reload, metrics) |
 | Python-only team | **C2** | 1038 fps; numpy + sys-shm + processes |
 | Offline / max throughput / many users | **D** | 0.61 ms/frame GPU cost; latency negotiable |
+| Multi-model production serving | **D (3 models)** | 1799-1816 fps; Triton scheduler has no hand-rolled equivalent |
 | Edge product, NVIDIA-supported stack | **E** | 1.5 ms single, batched multi-stream, zero custom code |
 
 ---
 
-## 8. Reproduce
+## 9. Reproduce
 
 ```bash
 docker restart triton-server        # image triton-bench:v3 (Triton arm)
@@ -170,7 +190,7 @@ docker exec ds-build bash -c 'cd /tmp && ./ds_bench --config /opt/ds/model/yolov
 Engines are gitignored — regenerate from the same ONNX (ultralytics export →
 `trtexec --fp16`) or pull the committed container images.
 
-## 9. Artifacts
+## 10. Artifacts
 
 - `cpp/src/main_cuda.cu` — A2 · `cpp/src/main.cpp` — A1
 - `cpp/src/grpc_client_cuda.cu` — B2/D(sync) · `cpp/src/grpc_client.cpp` — B1
