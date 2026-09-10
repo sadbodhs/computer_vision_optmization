@@ -1,9 +1,11 @@
 #!/bin/bash
-# Rigorous benchmark harness v2.1: 4 arms x concurrency x REPEATS
+# Rigorous benchmark harness v2.2: 4 arms (A2/B2/C2/D) x concurrency x REPEATS.
+# Binary names match README §10/§12 and cpp/CMakeLists.txt targets.
 set -u
 DURATION=${1:-10}
 REPEATS=${2:-3}
-R=/home/suchi/sadbodh/rt_vs_triton/results/v2
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"   # repo root, wherever it is checked out
+R=$ROOT/results/v2
 mkdir -p $R
 TS=$(date +%Y%m%d_%H%M%S)
 OUTF=$R/all_$TS.tsv
@@ -33,10 +35,12 @@ done
 
 # 1) capacity sweeps
 for N in 1 2 4 8 16; do
-  run_arm "A_cap_s$N" "cd $D && ./trt_pipeline    --engine model.plan --mode file --file frames.bin --streams $N --duration $DURATION"
-  run_arm "B_cap_s$N" "cd $D && ./trt_grpc_client --mode file --file frames.bin --model yolov8s     --streams $N --duration $DURATION"
-  run_arm "C_cap_s$N" "cd /work && python3 client.py --mode file --file cpp/build/frames.bin --model yolov8s --streams $N --duration $DURATION"
-  run_arm "D_cap_s$N" "cd $D && ./trt_grpc_client --mode file --file frames.bin --model yolov8s_dyn --streams $N --duration $DURATION"
+  # Arms match the published tables (README §2) and the canonical repro (README §10):
+  #   A2 full-CUDA · B2 CUDA-shm · C2 numpy+sys-shm · D async+dyn-batch
+  run_arm "A2_cap_s$N" "cd $D && ./trt_pipeline_cuda --engine /models/yolov8s/1/model.plan --mode file --file frames.bin --streams $N --duration $DURATION"
+  run_arm "B2_cap_s$N" "cd $D && ./trt_grpc_cuda  --mode file --file frames.bin --model yolov8s     --streams $N --duration $DURATION"
+  run_arm "C2_cap_s$N" "cd /work && python3 client_v2.py --mode file --file cpp/build/frames.bin --model yolov8s --transfer sys --streams $N --processes $N --duration $DURATION"
+  run_arm "D_cap_s$N"  "cd $D && ./trt_grpc_async --model yolov8s_dyn --file frames.bin --streams $N --duration $DURATION"
 done
 
 # 2) 3-process pure TRT capacity (3 independent pipelines)
@@ -47,10 +51,10 @@ for i in $(seq $REPEATS); do
 done
 
 # 3) RTSP end-to-end parity (source-capped 30fps)
-run_arm "A_rtsp"  "cd $D && ./trt_pipeline    --engine model.plan --url rtsp://localhost:8554/cam1 --streams 1 --duration $DURATION"
-run_arm "B_rtsp"  "cd $D && ./trt_grpc_client --mode rtsp --url rtsp://localhost:8554/cam1 --model yolov8s --streams 1 --duration $DURATION"
-run_arm "C_rtsp"  "cd /work && python3 client.py --model yolov8s --streams 1 --duration $DURATION"
-run_arm "C_rtsp3" "cd /work && python3 client.py --models yolov8n,yolov8s,yolo11n --streams 3 --duration $DURATION"
+run_arm "A2_rtsp" "cd $D && ./trt_pipeline_cuda --engine /models/yolov8s/1/model.plan --url rtsp://localhost:8554/cam1 --streams 1 --duration $DURATION"
+run_arm "B2_rtsp" "cd $D && ./trt_grpc_cuda --mode rtsp --url rtsp://localhost:8554/cam1 --model yolov8s --streams 1 --duration $DURATION"
+run_arm "C2_rtsp" "cd /work && python3 client_v2.py --model yolov8s --streams 1 --duration $DURATION"
+run_arm "C2_rtsp3" "cd /work && python3 client_v2.py --models yolov8n,yolov8s,yolo11n --streams 3 --duration $DURATION"
 
 # 4) 3-process pure TRT RTSP (the original step-2 comparison)
 for i in $(seq $REPEATS); do

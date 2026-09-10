@@ -5,7 +5,8 @@
 set -u
 DURATION=${1:-8}
 N=${2:-3}
-R=/home/suchi/sadbodh/rt_vs_triton/results/v3
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"   # repo root, wherever it is checked out
+R=$ROOT/results/v3
 mkdir -p $R
 OUTF=$R/parallel_contention_N${N}.tsv
 D=/work/cpp/build

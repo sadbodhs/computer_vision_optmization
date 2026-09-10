@@ -1,0 +1,12 @@
+# Keep the build context small: sources only. Models/videos/engines are bind-mounted
+# at runtime and regenerated via scripts/, never baked into the image.
+.git
+videos/
+results/
+**/*.plan
+**/*.engine
+**/*.onnx
+**/*.pt
+**/*.bin
+**/__pycache__/
+**/build/

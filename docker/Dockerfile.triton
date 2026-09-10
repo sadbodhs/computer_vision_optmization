@@ -1,0 +1,43 @@
+# triton-bench — Triton 24.12 server + C++ client SDK + the benchmark binaries.
+# Rebuilds the image that was previously only committed as triton-bench:v3, so the
+# repo alone is enough to reconstruct the Triton arm from scratch.
+#
+# Build (from repo root):  docker build -f docker/Dockerfile.triton -t triton-bench:v3 .
+#
+# Stage 1: pull the C++/Python client SDK (+ perf_analyzer) out of the -sdk image.
+FROM nvcr.io/nvidia/tritonserver:24.12-py3-sdk AS sdk
+
+# Stage 2: the server image (has TensorRT + CUDA), plus client SDK and our binaries.
+FROM nvcr.io/nvidia/tritonserver:24.12-py3
+
+# Client SDK lands at /opt (grpc_client.h -> /opt/include, libgrpcclient -> /opt/lib,
+# perf_analyzer -> /opt/bin) to match TRITON_CLIENT_ROOT and scripts/pa_sweep.sh.
+COPY --from=sdk /workspace/install /opt
+
+ENV DEBIAN_FRONTEND=noninteractive LD_LIBRARY_PATH=/opt/lib:${LD_LIBRARY_PATH}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake pkg-config \
+        libavcodec-dev libavformat-dev libavutil-dev libswscale-dev ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python deps: numpy client (C2) + model export (ultralytics -> ONNX).
+RUN pip install --no-cache-dir \
+        "tritonclient[all]" numpy \
+        ultralytics onnx onnxsim
+
+WORKDIR /work
+# Sources only (see .dockerignore); models + videos + frames.bin are bind-mounted at runtime.
+COPY cpp/    /work/cpp/
+COPY triton/ /work/triton/
+COPY scripts/ /work/scripts/
+COPY client.py /work/client.py
+
+# Build all C++ binaries into /work/cpp/build.
+RUN cmake -S /work/cpp -B /work/cpp/build -DTRITON_CLIENT_ROOT=/opt \
+    && cmake --build /work/cpp/build -j
+
+# Runtime (compose/CLI):
+#   docker run --gpus all --shm-size=1g --network host \
+#     -v $PWD/triton/models:/models -v $PWD:/work triton-bench:v3 \
+#     tritonserver --model-repository=/models
+# Benchmarks then exec into the container (see docker/README.md).

@@ -3,7 +3,7 @@
 # Usage: ./benchmark.sh [duration_seconds]
 set -e
 DURATION=${1:-15}
-BASE=/home/suchi/sadbodh/rt_vs_triton
+BASE="$(cd "$(dirname "$0")/.." && pwd)"   # repo root, wherever it is checked out
 RESULTS=$BASE/results
 mkdir -p $RESULTS
 TS=$(date +%Y%m%d_%H%M%S)

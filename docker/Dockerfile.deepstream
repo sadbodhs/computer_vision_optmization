@@ -1,0 +1,22 @@
+# ds-build — DeepStream 7.1 (TensorRT 10.3) for Flow E (ds_bench).
+# Rebuilds the ds-build image. The marcoslucianops YOLO parser project is mounted
+# at runtime (it is a separate repo), matching the original setup where
+# /home/suchi/sadbodh/deepstream-yolov11 was mounted at /opt/ds.
+#
+# Build (from repo root):  docker build -f docker/Dockerfile.deepstream -t ds-build:latest .
+FROM nvcr.io/nvidia/deepstream:7.1-triton-multiarch
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential pkg-config \
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+COPY cpp/src/ds_bench.cpp /work/cpp/src/ds_bench.cpp
+COPY docker/build_ds_bench.sh /work/docker/build_ds_bench.sh
+RUN bash /work/docker/build_ds_bench.sh
+
+# Runtime:
+#   docker run --gpus all -v $PWD/../deepstream-yolov11:/opt/ds ds-build:latest ...
+# Engines (.engine) are rebuilt in-container from the same ONNX via nvinfer on first run.

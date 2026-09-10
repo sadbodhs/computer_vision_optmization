@@ -239,13 +239,18 @@ every frame of the stream.
 ## 12. Epilogue: reproducibility
 
 Everything — both pipelines, the Triton model repo, the benchmark harness,
-the raw results — lives in this repository and runs inside a committed
-Docker image (`triton-bench:v3`). The models are regenerated from
-`ultralytics` exports + `trtexec`; the engines themselves are gitignored.
+the raw results, **and the Dockerfiles that build the two images** — lives in
+this repository. The images rebuild from source (`docker/build.sh`), the models
+regenerate from `ultralytics` exports + `trtexec` (`scripts/export_models.sh`),
+and the capacity-replay input regenerates from a source video
+(`scripts/make_frames.sh`). Engines, ONNX, and `frames.bin` are gitignored
+because they are GPU-specific or large — not because they are irreproducible.
 
 ```bash
-docker restart triton-server   # image: triton-bench:v3
-./scripts/benchmark_v2.sh 10 3 # the full 4-arm sweep
+docker/build.sh                              # build both images from source
+scripts/export_models.sh                     # engines
+scripts/make_frames.sh videos/real.mp4 500   # frames.bin
+./scripts/benchmark_v2.sh 10 3               # the full 4-arm sweep
 ```
 
 Raw data: `results/` (v1 = the flawed first pass, kept for honesty;

@@ -1,12 +1,18 @@
-# Model binaries (regenerate via scripts + export commands in README)
+# Model binaries — GPU/driver-specific, regenerate with scripts/export_models.sh
 *.plan
 *.engine
 *.onnx
 *.pt
+
+# Preprocessed capacity-replay input — regenerate with scripts/make_frames.sh
 *.bin
 
-# Videos (generate with ffmpeg testsrc2 or download samples)
+# Videos (any source video; the benchmarks use videos/real.mp4)
 videos/
+
+# Local export scratch dirs created by scripts/export_models.sh
+_exp_fixed/
+_exp_dyn/
 
 # Misc
 __pycache__/
