@@ -3,8 +3,10 @@
 //   capacity : replay preprocessed frames from a binary file as fast as possible
 //   rtsp     : live RTSP decode -> preprocess -> infer (parity with other arms)
 // Reports per-frame latency percentiles and throughput.
-#include <grpc_client.h>
+
+#define TRITON_ENABLE_GPU 1
 #include <cuda_runtime_api.h>
+#include <grpc_client.h>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -142,7 +144,7 @@ static void run_grpc_stream(GrpcStream* ctx) {
       tc::InferRequestedOutput::Create(&out, "output0");
       std::vector<const tc::InferRequestedOutput*> outputs = {out};
       tc::InferResult* res;
-      CHECK_OK(client->Infer(&res, {ctx->model}, inputs, outputs));
+      CHECK_OK(client->Infer(&res, tc::InferOptions(ctx->model), inputs, outputs));
       const float* out_data;
       size_t out_np;
       res->RawData("output0", (const uint8_t**)&out_data, &out_np);
@@ -163,7 +165,7 @@ static void run_grpc_stream(GrpcStream* ctx) {
     avformat_find_stream_info(fmt, nullptr);
     int vs = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
     const AVCodec* dec = avcodec_find_decoder_by_name("h264_cuvid");
-    if (!dec) dec = avcodec_find_decoder(0);
+    if (!dec) dec = avcodec_find_decoder(fmt->streams[vs]->codecpar->codec_id);
     AVCodecContext* cctx = avcodec_alloc_context3(dec);
     avcodec_parameters_to_context(cctx, fmt->streams[vs]->codecpar);
     cctx->pix_fmt = AV_PIX_FMT_NV12;
@@ -199,7 +201,7 @@ static void run_grpc_stream(GrpcStream* ctx) {
       tc::InferRequestedOutput::Create(&out, "output0");
       std::vector<const tc::InferRequestedOutput*> outputs = {out};
       tc::InferResult* res;
-      CHECK_OK(client->Infer(&res, {ctx->model}, inputs, outputs));
+      CHECK_OK(client->Infer(&res, tc::InferOptions(ctx->model), inputs, outputs));
       const float* out_data;
       size_t out_np;
       res->RawData("output0", (const uint8_t**)&out_data, &out_np);

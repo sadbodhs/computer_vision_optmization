@@ -51,6 +51,23 @@ static int nms_count(const GPUDet* dets, int n, float iou_thr) {
   return kept;
 }
 
+__global__ void compact_candidates_kernel(
+    const float* __restrict__ out, int num_classes, int num_anchors, float conf_thr,
+    GPUDet* __restrict__ dets, int* __restrict__ d_count, int max_dets) {
+  int a = blockIdx.x * blockDim.x + threadIdx.x;
+  if (a >= num_anchors) return;
+  float best = 0.f; int best_c = -1;
+  for (int c = 0; c < num_classes; ++c) {
+    float s = out[(4 + c) * num_anchors + a];
+    if (s > best) { best = s; best_c = c; }
+  }
+  if (best < conf_thr) return;
+  float cx = out[0 * num_anchors + a], cy = out[1 * num_anchors + a];
+  float w = out[2 * num_anchors + a], h = out[3 * num_anchors + a];
+  int slot = atomicAdd(d_count, 1);
+  if (slot < max_dets) dets[slot] = {cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, best, best_c};
+}
+
 // per-request context handed to the completion callback
 struct ReqCtx {
   tc::InferResult* result = nullptr;
@@ -69,7 +86,7 @@ struct Stats {
 };
 
 static void run_stream(int stream_id, const std::string& model, const std::string& file_path,
-                       double duration, int depth, Stats* stats) {
+                       double duration, Stats* stats) {
   const int IMG = 640, NUM_CLASSES = 80, NUM_ANCHORS = 8400;
   const size_t IN_BYTES = (size_t)IMG * IMG * 3 * sizeof(float);
   const size_t OUT_BYTES = (size_t)84 * NUM_ANCHORS * sizeof(float);
@@ -182,22 +199,6 @@ static void run_stream(int stream_id, const std::string& model, const std::strin
 }
 
 // compact kernel (same as other flows)
-__global__ void compact_candidates_kernel(
-    const float* __restrict__ out, int num_classes, int num_anchors, float conf_thr,
-    GPUDet* __restrict__ dets, int* __restrict__ d_count, int max_dets) {
-  int a = blockIdx.x * blockDim.x + threadIdx.x;
-  if (a >= num_anchors) return;
-  float best = 0.f; int best_c = -1;
-  for (int c = 0; c < num_classes; ++c) {
-    float s = out[(4 + c) * num_anchors + a];
-    if (s > best) { best = s; best_c = c; }
-  }
-  if (best < conf_thr) return;
-  float cx = out[0 * num_anchors + a], cy = out[1 * num_anchors + a];
-  float w = out[2 * num_anchors + a], h = out[3 * num_anchors + a];
-  int slot = atomicAdd(d_count, 1);
-  if (slot < max_dets) dets[slot] = {cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, best, best_c};
-}
 
 int main(int argc, char** argv) {
   std::string model = "yolov8s_dyn", file_path = "frames.bin";

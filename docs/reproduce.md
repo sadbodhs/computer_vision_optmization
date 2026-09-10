@@ -13,11 +13,14 @@ recipe: [`docker/README.md`](../docker/README.md).
 docker/build.sh                              # build triton-bench:v3 + ds-build:latest
 scripts/export_models.sh                     # pt -> ONNX -> FP16 .plan (all 6 engines)
 docker run -d --name triton-server --gpus all --shm-size=1g --network host \
-  -v "$PWD/triton/models:/models" -v "$PWD:/work" \
+  -v "$PWD/triton/models:/models" -v "$PWD/videos:/work/videos" \
   triton-bench:v3 tritonserver --model-repository=/models
 scripts/make_frames.sh videos/real.mp4 500   # -> cpp/build/frames.bin (capacity input)
 scripts/benchmark_v2.sh 10 3                  # the full 4-arm sweep
 ```
+
+> Do not bind-mount the repo over `/work`: the image carries the sources *and*
+> the compiled binaries in `/work/cpp/build`, and the mount would hide them.
 
 Engines, ONNX, and `frames.bin` are gitignored — GPU-specific or large, but fully
 regenerable by the two scripts above. The images rebuild from source, so nothing

@@ -36,8 +36,14 @@ COPY client.py /work/client.py
 RUN cmake -S /work/cpp -B /work/cpp/build -DTRITON_CLIENT_ROOT=/opt \
     && cmake --build /work/cpp/build -j
 
-# Runtime (compose/CLI):
-#   docker run --gpus all --shm-size=1g --network host \
-#     -v $PWD/triton/models:/models -v $PWD:/work triton-bench:v3 \
-#     tritonserver --model-repository=/models
+# The harness and README invoke the C2 client as `cd /work && python3 client_v2.py`.
+# Keep that working while the file lives at its repo path (/work/triton/).
+RUN ln -sf /work/triton/client_v2.py /work/client_v2.py
+
+# Runtime — do NOT bind-mount the repo over /work: that shadows the binaries built
+# above (the repo has no cpp/build). Mount only the model repo, plus videos if you
+# need to regenerate frames.bin:
+#   docker run -d --name triton-server --gpus all --shm-size=1g --network host \
+#     -v $PWD/triton/models:/models -v $PWD/videos:/work/videos \
+#     triton-bench:v3 tritonserver --model-repository=/models
 # Benchmarks then exec into the container (see docker/README.md).
