@@ -119,11 +119,24 @@ latency *worse*, which corrected an earlier claim that 5ms was the floor of D's
 and NVIDIA's Model Analyzer. Flow D's dynamic-batch engines also need
 per-batch-size graph capture (`graph_spec`), untested.
 
-### DeepStream E2 in capacity mode
+### DeepStream E2 in capacity mode - attempted, harness-bound
 
-E2 has only been run source-bound (5.4% GPU). Its true batched ceiling — the
-direct comparison against D's 1665 fps — needs the `frames.bin` file-replay
-treatment. See [DeepStream](deepstream.md#the-open-comparison).
+Run, and the result is that the measurement does not measure what it needs to.
+`ds_bench --mode file` feeds NV12 frames from an appsrc per stream; at 8 streams
+it reaches ~501 fps against D's 1640, which looks decisive until you check the
+GPU: **median 0% utilisation**. The fixed batch-8 engine also performs identically
+to the dynamic one despite being 3x faster at batch 1, and the frame count is
+byte-identical across repeats of a time-limited run.
+
+The harness is the bottleneck - a 345 KB CPU memcpy per frame per stream, plus a
+sysmem->NVMM conversion. Same trap as the study's first pass, in new clothes.
+
+**Still open.** Closing it means pushing pre-allocated NVMM buffers or using a
+buffer pool so the feed leaves the critical path - a change to `ds_bench`, not a
+parameter. What the attempt did establish: at 1 stream with a fixed batch-1
+engine, E2 sustains **653 fps** in capacity mode against 45 fps source-bound, so
+the source really was the limit in the E1/E2 tables. See
+[deepstream](deepstream.md).
 
 ## Tier 3 — completeness for a reference
 

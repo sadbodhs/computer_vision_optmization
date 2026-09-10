@@ -1,0 +1,9 @@
+streams	batch	engine	fps	gpu_util_median_pct	note
+1	1	fixed_b1	653.02		vs 45 fps source-bound
+1	1	dynamic_b1-8	210.48		dynamic engine 3x slower at batch 1
+3	3	dynamic_b1-8	400.91	
+8	8	dynamic_b1-8	501.34	
+8	8	fixed_b8	499.97	
+8	8	fixed_b8	502.02	
+8	8	fixed_b8	501.91	
+8	8	fixed_b8	501.56	0	HARNESS-BOUND: GPU idle, appsrc feed is the limit

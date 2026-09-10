@@ -56,12 +56,54 @@ batch-assembly wait — a batch of 8 fills every ~33 ms when sources arrive at
 Same trade as [flow D](batching.md), reached by a different road: E2's 33 ms is the
 frame interval; D's 6–74 ms is the queue.
 
-## The open comparison
+## Capacity mode: attempted, and it measures the harness
 
-E2 has **not** been run in capacity mode. To compare its batched-inference ceiling
-against D's 1665 fps directly, E2 needs the same file-replay treatment (the
-`frames.bin` trick). Its per-batch overhead — no RPC at all — should push it above
-D. **Untested; stated as a hypothesis, not a result.** See [roadmap](roadmap.md).
+The study hypothesised that E2 in capacity mode "should push it above D", since
+DeepStream has no RPC at all. That was worth testing, and `ds_bench --mode file`
+does it: an `appsrc` per stream pushes raw NV12 frames flat-out from a file into
+`nvstreammux`, with `sync=false` on the sink so nothing waits on a clock.
+
+| Config | Engine | Total fps |
+|---|---|---|
+| 1 stream | fixed batch-1 | 653.0 |
+| 1 stream | dynamic b1–8 | 210.5 |
+| 3 streams | dynamic b1–8 | 400.9 |
+| 8 streams | dynamic b1–8 | 501.3 |
+| 8 streams | **fixed batch-8** | **~501** (500.0 / 502.0 / 501.9) |
+
+Against D's 1640 fps that looks like a decisive answer. **It isn't one**, and the
+reason is in the next line:
+
+> **GPU utilisation during the 8-stream run: median 0%, max 99%.**
+
+The GPU is idle almost the whole time. Two more tells point the same way: the
+fixed batch-8 engine performs *identically* to the dynamic one (~501 fps both),
+even though the dynamic engine is 3× slower at batch 1 (210 vs 653 fps) — so the
+engine is plainly not the constraint; and the frame count comes out at exactly
+6128 on three consecutive runs of a *time-limited* benchmark, which is what a
+deterministic feed rate looks like, not a throughput measurement.
+
+**The bottleneck is the test harness.** Each `appsrc` push does a 345 KB CPU
+`memcpy` per frame, then `nvvideoconvert` copies sysmem→NVMM, per stream, per
+frame. At eight streams that path saturates before DeepStream does, and the
+inference sits waiting.
+
+### So the comparison is still open
+
+This is the same trap the study's first pass fell into, in a new costume — see
+[methodology](methodology.md): *a benchmark that saturates the source measures the
+source.* Here the "source" is our own frame feeder. **E2's batched-inference
+ceiling remains unmeasured, and 501 fps must not be quoted as it.**
+
+Closing it properly means removing the feed from the critical path: pushing
+pre-allocated NVMM buffers rather than sysmem ones, or using a buffer pool so
+there is no per-frame `memcpy` and no format conversion. That is a real change to
+`ds_bench`, not a parameter.
+
+**What can be said:** at a single stream with a fixed batch-1 engine, E2 sustains
+**653 fps** in capacity mode against a source-bound 45 fps — so the source, not
+DeepStream, was the limit in the [E1/E2 tables above](#e2--multi-stream-batched).
+That much the exercise did establish. See [roadmap](roadmap.md).
 
 ## Verdict
 
