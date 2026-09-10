@@ -20,3 +20,8 @@ _exp_dyn/
 __pycache__/
 *.pyc
 core
+
+# MkDocs build output (site is generated, never committed)
+site_src/
+_site/
+site/

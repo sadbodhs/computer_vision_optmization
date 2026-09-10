@@ -1,0 +1,59 @@
+site_name: Triton vs TensorRT vs DeepStream
+site_description: Measured comparison of CV inference serving pipelines on an RTX 3090
+repo_url: https://github.com/sadbodhs/computer_vision_optmization
+repo_name: sadbodhs/computer_vision_optmization
+docs_dir: site_src
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.sections
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+
+plugins:
+  - search
+
+nav:
+  - Overview: index.md
+  - Methodology: methodology.md
+  - Results: results.md
+  - Transport: transport.md
+  - Batching: batching.md
+  - Contention: contention.md
+  - Stage decomposition: stage-decomposition.md
+  - DeepStream: deepstream.md
+  - CUDA graphs: cuda-graphs.md
+  - Triton tuning: triton-tuning.md
+  - Accuracy: accuracy.md
+  - Precision: precision.md
+  - Reproduce: reproduce.md
+  - Roadmap: roadmap.md
