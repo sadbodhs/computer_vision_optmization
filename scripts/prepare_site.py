@@ -91,6 +91,21 @@ if os.path.exists(results_md):
 
 # README.md -> index.md
 readme = open(os.path.join(REPO, "README.md"), encoding="utf-8").read()
-open(os.path.join(OUT, "index.md"), "w", encoding="utf-8").write(link_re.sub(fix_readme_link, readme))
+index_md = link_re.sub(fix_readme_link, readme)
+
+# Same PNG -> interactive swap on the index. Note the src has NO ../ here: index.md
+# is served at the site root, whereas results.md is served at results/index.html.
+INDEX_PNG = "![Latency versus throughput for every flow](img/pareto-latency-throughput.png)"
+INDEX_IFRAME = (
+    '<iframe src="img/pareto_interactive.html" title="Latency vs throughput"\n'
+    '        style="width:100%; height:540px; border:0;" loading="lazy"></iframe>'
+)
+if INDEX_PNG in index_md:
+    index_md = index_md.replace(INDEX_PNG, INDEX_IFRAME)
+    print("swapped the index hero PNG for the interactive chart")
+else:
+    print("WARNING: index hero PNG not matched - it will stay static")
+
+open(os.path.join(OUT, "index.md"), "w", encoding="utf-8").write(index_md)
 
 print(f"staged {n} docs + index.md into {OUT}")
