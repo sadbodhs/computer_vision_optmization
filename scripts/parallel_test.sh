@@ -36,12 +36,18 @@ done
 wait
 EOF
 
+CONTAINER=${CONTAINER:-triton-server}
+
 echo "flow,instance,json" | tee $OUTF
 for FLOW in A2 B2 C2; do
   echo "=== $FLOW x $N ==="
-  bash /tmp/launch_$FLOW.sh 2>/dev/null
+  # The launch scripts reference container paths (/work/cpp/build, /models), so they
+  # must run INSIDE the container -- running them on the host silently produced
+  # nothing, which is why every instance came back blank.
+  docker cp /tmp/launch_$FLOW.sh $CONTAINER:/tmp/launch_$FLOW.sh > /dev/null
+  docker exec $CONTAINER bash /tmp/launch_$FLOW.sh 2>/dev/null
   for i in $(seq $N); do
-    J=$(cat /tmp/par_${FLOW}_$i.json 2>/dev/null | tail -1)
+    J=$(docker exec $CONTAINER sh -c "cat /tmp/par_${FLOW}_$i.json 2>/dev/null | tail -1")
     echo "$FLOW,$i,$J" | tee -a $OUTF
     echo "  [$FLOW #$i] $J"
   done

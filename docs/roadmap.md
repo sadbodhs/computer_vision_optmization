@@ -59,18 +59,20 @@ per-launch CPU cost, which CUDA graphs exist to amortize. Supported:
 *Why it matters here*: this attacks the **headline** A2 latency directly, and
 Triton's equivalent would narrow B2's remaining gap.
 
-### CUDA MPS
+### CUDA MPS — ✅ measured (A2), partially open (B2)
 
-**The most likely finding to change under retest.**
-[Contention](contention.md) concludes "Triton shares the GPU more gracefully than
-raw CUDA contexts" from A2 +153% vs B2 +76% at N=3. That comparison was run
-*without* MPS — and removing inter-process context-switch serialization is exactly
-what MPS does. Verified available on the rig (`nvidia-cuda-mps-control` present,
-compute mode `Default`).
+Done, and it changed the study. See
+[contention → MPS](contention.md#mps-changes-two-of-those-conclusions).
+A2 at N=3: latency growth **+148% → +97%**, total throughput **960 → 1266 fps**,
+which is **24% above the batch-1 engine cap** — so "throughput plateaus at the
+engine cap" was a time-slicing artifact, not a hardware ceiling. Solo performance
+is unaffected.
 
-*Method*: rerun `scripts/parallel_test.sh` with the MPS daemon active. If A2's
-+153% collapses toward B2's +76%, that finding is about MPS being off, not about
-Triton being clever.
+**Still open:** B2 under MPS. An MPS client must share the daemon's uid, and while
+a daemon runs, any CUDA process that cannot reach it fails with `error 805` —
+including the root-owned `triton-server`. Closing this needs either a root MPS
+daemon (requires sudo on the host) or a non-root Triton container. Until then the
+symmetric A2+MPS vs B2+MPS comparison is missing.
 
 ### In-graph NMS (`EfficientNMS_TRT`)
 
