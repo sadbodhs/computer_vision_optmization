@@ -54,6 +54,10 @@ reads ~31.9 ms — that is socket-read blocking, not compute. Do not optimize it
 **The fused CUDA preprocess kernel (0.15 ms) is 8× faster than numpy-on-CPU
 (1.26 ms)** — and numpy is already the *fast* Python option; torch was worse.
 
+> Measured when the kernel still used nearest-neighbour interpolation. It now
+> interpolates bilinearly, which costs **+0.0085 ms** and recovers 1.25% mAP —
+> see [accuracy](accuracy.md). The stage remains far from the bottleneck.
+
 **The framework tax lives only in the infer stage.** B2 pays 1.16–1.71 ms where A2
 pays 0.98–1.22.
 

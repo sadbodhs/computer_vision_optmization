@@ -55,11 +55,27 @@ __global__ void nv12_letterbox_kernel(
   float r, g, b;
   if (!inside) { r = g = b = 114.0f / 255.0f; }
   else {
-    int u = sx * src_w / nw, v = sy * src_h / nh;
-    unsigned char Y = src_y[(size_t)v * y_pitch + u];
+    // Bilinear luma, nearest chroma. Center-aligned sampling, matching
+    // cv2 INTER_LINEAR: src = (dst + 0.5) * scale - 0.5. Nearest-neighbour here
+    // measured -1.25% mAP50-95 against the reference (see docs/accuracy.md);
+    // chroma stays nearest because NV12 already subsamples it 2x.
+    float fx = ((float)sx + 0.5f) * (float)src_w / (float)nw - 0.5f;
+    float fy = ((float)sy + 0.5f) * (float)src_h / (float)nh - 0.5f;
+    int x0 = (int)floorf(fx), y0 = (int)floorf(fy);
+    float ax = fx - (float)x0, ay = fy - (float)y0;
+    int x0c = min(max(x0, 0), src_w - 1), x1c = min(max(x0 + 1, 0), src_w - 1);
+    int y0c = min(max(y0, 0), src_h - 1), y1c = min(max(y0 + 1, 0), src_h - 1);
+    float Y00 = (float)src_y[(size_t)y0c * y_pitch + x0c];
+    float Y01 = (float)src_y[(size_t)y0c * y_pitch + x1c];
+    float Y10 = (float)src_y[(size_t)y1c * y_pitch + x0c];
+    float Y11 = (float)src_y[(size_t)y1c * y_pitch + x1c];
+    float Yb = (Y00 * (1.0f - ax) + Y01 * ax) * (1.0f - ay)
+             + (Y10 * (1.0f - ax) + Y11 * ax) * ay;
+    int u = min(max((int)(fx + 0.5f), 0), src_w - 1);
+    int v = min(max((int)(fy + 0.5f), 0), src_h - 1);
     unsigned char U = src_uv[(size_t)(v >> 1) * uv_pitch + ((u >> 1) << 1)];
     unsigned char V = src_uv[(size_t)(v >> 1) * uv_pitch + ((u >> 1) << 1) + 1];
-    float yf = (float)Y - 16.0f, uf = (float)U - 128.0f, vf = (float)V - 128.0f;
+    float yf = Yb - 16.0f, uf = (float)U - 128.0f, vf = (float)V - 128.0f;
     r = fmaxf(0.f, fminf(1.164f * yf + 1.596f * vf, 255.f)) / 255.0f;
     g = fmaxf(0.f, fminf(1.164f * yf - 0.392f * uf - 0.813f * vf, 255.f)) / 255.0f;
     b = fmaxf(0.f, fminf(1.164f * yf + 2.017f * uf, 255.f)) / 255.0f;

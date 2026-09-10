@@ -58,7 +58,44 @@ puts preprocessing at 0.15 ms against a 0.97 ms engine).
 > **This is the finding that justifies having an accuracy axis at all.** No amount
 > of throughput measurement could surface it: every flow was *equally* wrong, so
 > they all agreed with each other, and detection counts looked plausible. It took
-> an external ground truth to see it.
+> an external ground truth to see it. It is now fixed — see below.
+
+## 3. Fixed — bilinear costs 0.6% of frame time, buys 1.25% mAP
+
+All four implementations now interpolate bilinearly with center-aligned sampling
+(`src = (dst + 0.5) * scale - 0.5`, matching `cv2.INTER_LINEAR`):
+
+| File | What changed |
+|---|---|
+| `cpp/src/main_cuda.cu` | `nv12_letterbox_kernel` — bilinear luma, nearest chroma |
+| `cpp/src/grpc_client_cuda.cu` | same kernel |
+| `cpp/src/main_cuda.cpp` | same kernel (not built, kept consistent) |
+| `triton/client_v2.py` | `letterbox_nv12_np` — vectorised bilinear |
+
+Chroma stays nearest because NV12 already subsamples it 2×; the luma plane
+carries the detail the detector uses.
+
+**Verified numerically:** the fixed numpy path reproduces `cv2.INTER_LINEAR`
+to **0.00000 max absolute difference** on a structured test frame — so it is the
+same interpolation the +1.25% mAP above was measured with, not an approximation
+of it.
+
+**Cost**, measured on A2 in RTSP mode (the only mode that runs the letterbox —
+capacity mode replays already-preprocessed tensors, so it is unaffected), 3 runs
+of 20 s each:
+
+| Kernel | preprocess stage | p50 latency |
+|---|---|---|
+| nearest | 0.1860 ms | 1.305–1.326 ms |
+| **bilinear** | **0.1945 ms** | 1.325–1.327 ms |
+
+**+0.0085 ms per frame** — 4.6% of a preprocessing stage that is itself ~0.19 ms
+of a ~1.35 ms pipeline, so roughly **0.6% of total frame time for a 1.25% mAP
+recovery**. At 30 fps it is 0.03% of the 33.3 ms budget.
+
+> RTSP *fps* is not a valid comparator here (19.5–30.9 across runs on both
+> kernels) because that mode is source-bound and the stream drops frames. The
+> per-stage timer is the measurement; the throughput column is noise.
 
 ## Caveats
 

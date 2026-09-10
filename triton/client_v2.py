@@ -37,10 +37,19 @@ def letterbox_nv12_np(buf: np.ndarray, src_w: int, src_h: int) -> np.ndarray:
     rgb /= 255.0
     scale = min(IMG / src_w, IMG / src_h)
     nw, nh = int(src_w * scale), int(src_h * scale)
-    if (nw, nh) != (src_w, src_h):  # nearest resize only if needed
-        rows = (np.arange(nh) * src_h / nh).astype(int)
-        cols = (np.arange(nw) * src_w / nw).astype(int)
-        rgb = rgb[:, rows][:, :, cols]
+    if (nw, nh) != (src_w, src_h):
+        # Bilinear, center-aligned (cv2 INTER_LINEAR sampling). Nearest-neighbour
+        # cost -1.25% mAP50-95 against the reference -- see docs/accuracy.md.
+        fy = (np.arange(nh) + 0.5) * src_h / nh - 0.5
+        fx = (np.arange(nw) + 0.5) * src_w / nw - 0.5
+        y0 = np.floor(fy).astype(int); x0 = np.floor(fx).astype(int)
+        ay = (fy - y0).astype(np.float32)[None, :, None]
+        ax = (fx - x0).astype(np.float32)[None, None, :]
+        y0c = np.clip(y0, 0, src_h - 1); y1c = np.clip(y0 + 1, 0, src_h - 1)
+        x0c = np.clip(x0, 0, src_w - 1); x1c = np.clip(x0 + 1, 0, src_w - 1)
+        top = rgb[:, y0c][:, :, x0c] * (1.0 - ax) + rgb[:, y0c][:, :, x1c] * ax
+        bot = rgb[:, y1c][:, :, x0c] * (1.0 - ax) + rgb[:, y1c][:, :, x1c] * ax
+        rgb = (top * (1.0 - ay) + bot * ay).astype(np.float32)
     canvas = np.full((3, IMG, IMG), 114.0 / 255.0, dtype=np.float32)
     py, px = (IMG - nh) // 2, (IMG - nw) // 2
     canvas[:, py:py + nh, px:px + nw] = rgb

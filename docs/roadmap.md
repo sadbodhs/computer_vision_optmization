@@ -23,10 +23,12 @@ ultralytics end-to-end on the same images and thresholds.
 - With linear resize the study's chain is **within 0.06% of the PyTorch
   reference** - the letterbox geometry, FP16 engine, custom class-aware NMS and
   un-letterboxing math are all validated rather than assumed.
-- **As shipped it uses nearest-neighbour resize**, in the CUDA kernel *and* the
+- **As shipped it used nearest-neighbour resize**, in the CUDA kernel *and* the
   numpy client, costing **-1.25% mAP50-95** across A2/B2/C2/D alike. Pure speed
   benchmarking could never surface this: every flow was equally wrong, so they
-  agreed with each other.
+  agreed with each other. **Now fixed** - all implementations interpolate
+  bilinearly, verified to match `cv2.INTER_LINEAR` exactly, at a cost of
+  +0.0085 ms/frame (~0.6% of frame time).
 
 **Still open:** only 500 of 5000 images, only YOLOv8s, and the comparison is
 chain-vs-chain so it does not decompose preprocessing / precision / NMS
