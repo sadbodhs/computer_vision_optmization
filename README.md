@@ -5,21 +5,10 @@ GPU, which serving pipeline processes a frame fastest, and which delivers the
 most frames per second?*
 
 Hardware: RTX 3090 · Triton 24.12 · TensorRT 10.7/10.3 · DeepStream 7.1 ·
-3× YOLO FP16 engines @ 640×640 (identical ONNX, md5-verified across flows).
+**YOLOv8s** FP16 @ 640×640 (identical ONNX, md5-verified across flows).
 Everything runs in Docker.
 
-## Model card (the exact model every flow runs)
-
-| Item | Value |
-|---|---|
-| **Model** | YOLOv8s (Ultralytics), COCO 80 classes |
-| **Input** | 640×640, RGB, normalized /255 (sigmoid baked into export) |
-| **Precision** | FP16 engines (built from the same ONNX per TRT version) |
-| **Engine format** | `.plan` (Triton) / `.engine` (DeepStream) — same serialization, different naming |
-| **Output** | `[1, 84, 8400]` = 4 box + 80 class scores, conf 0.25, class-aware NMS IoU 0.45 |
-| **Also tested** | YOLOv8n (1490 qps) · YOLO11n (1259 qps) for multi-model runs |
-| **Source files** | `triton/models/*/model.onnx` — the single source of truth, md5 `0fa8a042…` |
-| **Preproc contract** | centered letterbox, pad 114, BGR→RGB, /255 — identical in every flow |
+## 10. Artifacts
 
 ---
 
@@ -64,11 +53,11 @@ Python numpy, sys-shm · **D** Triton async in-flight + batch-8 engines ·
 Two numbers per cell. **`fps↑` = throughput (higher is better) · `ms↓` = per-frame
 latency p50 (lower is better)**. Best value per row is **bold**.
 
-| Concurrency | A1 | A2 | B1 | B2 | C1 (torch) | C2 (numpy) | D (async batch-8) |
+| Concurrency | A1 — C++ TRT, CPU path | A2 — C++ TRT, full-CUDA | B1 — Triton+C++ gRPC | B2 — Triton+C++ CUDA-shm | C1 — Triton+PyTorch | C2 — Triton+Py numpy+shm | D — Triton async, batch-8 |
 |---|---|---|---|---|---|---|---|
 | 1 | 456↑ · 1.32↓ | 809↑ · **1.23↓** | 222↑ · 3.27↓ | 654↑ · 1.28↓ | 144↑ · 6.4↓ | 469↑ · 1.69↓ | **1041↑** · wait 6.2↓svc 0.61 |
 | 2 | 793↑ · 1.50↓ | **1219↑ · 1.60↓** | 368↑ · 4.03↓ | 951↑ · 1.83↓ | 198↑ · 9.6↓ | 736↑ · 2.20↓ | **1136↑** · wait 11.1 svc 0.61 |
-| 4 | 956↑ · 3.31↓ | **1175↑ · 3.40↓** | 472↑ · 6.90↓ | 1092↑ · 4.02↓ | 218↑ · 10.8↓ | 986↑ · 3.15↓ | **1378↑** · wait 19.2 svc 0.61 |
+| 4 | 956↑ · 3.31↓ | **1175↑ · 3.40↓** | 472↑ · 6.90↓ | **1092↑ · 4.02↓** | 218↑ · 10.8↓ | 986↑ · 3.15↓ | **1378↑** · wait 19.2 svc 0.61 |
 | 8 | 1055↑ · 6.43↓ | **1187↑ · 6.72↓** | 488↑ · 14.6↓ | **1131↑ · 6.60↓** | 222↑ · 12.0↓ | 1037↑ · 6.86↓ | **1640↑** · wait 36.6 svc 0.61 |
 | 16 | 1205↑ · 11.8↓ | 1160↑ · 13.8↓ | 496↑ · 30.4↓ | **1128↑ · 13.5↓** | 225↑ · 14.7↓ | 1038↑ · 14.5↓ | **1665↑** · wait 73.9 svc 0.61 |
 
@@ -179,14 +168,14 @@ client; its scheduler is the irreplaceable part.
 
 ## 8. Decision guide
 
-| Scenario | Pick | Why |
-|---|---|---|
-| Live camera, lowest latency, full control | **A2** | 1.23 ms, no dependencies |
-| Live multi-stream, want a server | **B2** | 1.28 ms + Triton ops (reload, metrics) |
-| Python-only team | **C2** | 1038 fps; numpy + sys-shm + processes |
-| Offline / max throughput / many users | **D** | 0.61 ms/frame GPU cost; latency negotiable |
-| Multi-model production serving | **D (3 models)** | 1799-1816 fps; Triton scheduler has no hand-rolled equivalent |
-| Edge product, NVIDIA-supported stack | **E** | 1.5 ms single, batched multi-stream, zero custom code |
+| Scenario | Pick | Latency (p50/frame) | Throughput | Why this pick |
+|---|---|---|---|---|
+| Live camera, lowest latency, full control | **A2** — C++ TRT full-CUDA | **1.23 ms** | 809 fps | fastest per frame; zero dependencies |
+| Live multi-stream, want a server | **B2** — Triton + CUDA shm | 1.28 ms | 1131 fps | ≈A2 latency + Triton ops (reload, metrics) |
+| Python-only team | **C2** — Triton + numpy + sys-shm | 1.69 ms | 1038 fps | within 0.4 ms of C++ with pure-Python client |
+| Offline / max throughput, latency negotiable | **D** — Triton async, batch-8 | 6.2–74 ms wait (0.61 ms GPU service) | 1640–1665 fps | cheapest GPU service per frame (0.61 ms) |
+| Multi-model production serving | **D** — 3 models × async batch-8 | 29–59 ms wait | **1799–1816 fps** | Triton scheduler has no hand-rolled equivalent |
+| Edge product, NVIDIA-supported stack | **E** — DeepStream | 1.50 ms (1 stream) | 45 fps/stream (source-bound) | zero custom code; NVDEC→infer integrated |
 
 ---
 
