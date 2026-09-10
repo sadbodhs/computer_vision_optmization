@@ -89,14 +89,17 @@ for a Triton deployment.
 B2 was measured by running Triton as non-root - an MPS client must share the
 daemon's uid, and a root server cannot reach a user-owned daemon (`error 805`).
 
-### In-graph NMS (`EfficientNMS_TRT`)
+### In-graph NMS - measured
 
-Every flow ships a `[1,84,8400]` FP32 output = **2.8 MB/frame**, then post-processes
-it. Folding NMS into the engine collapses that to a few KB at the source.
+Done: [in-graph NMS](in-graph-nms.md). Folding NMS into the engine shrinks the
+output from `[1,84,8400]` (2.82 MB) to `[1,300,6]` (7.2 KB), 392x. The engine gets
+**18.6% slower** (1023 -> 833 qps) but the raw-gRPC round trip gets **33% faster**
+(258.9 -> 344.7 fps, 3.79 -> 2.86 ms): shipping that output costs ~1.15 ms/frame,
+against a ~0.22 ms engine penalty.
 
-*Why it matters here*: this is likely a large share of B2/C2's residual cost and
-would change the [transport](transport.md) conclusions — the copy you cannot
-eliminate is the one you never make.
+It helps the naive paths (B1, C1/C2) and probably hurts the zero-copy ones (B2/D),
+which already avoid the transfer with a GPU compact kernel - untested there,
+because the C++ clients expect the `[1,84,8400]` shape.
 
 ### Triton knobs — ✅ partly swept
 

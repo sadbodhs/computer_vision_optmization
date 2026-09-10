@@ -53,6 +53,7 @@ nav:
   - DeepStream: deepstream.md
   - CUDA graphs: cuda-graphs.md
   - Triton tuning: triton-tuning.md
+  - In-graph NMS: in-graph-nms.md
   - Accuracy: accuracy.md
   - Precision: precision.md
   - Reproduce: reproduce.md

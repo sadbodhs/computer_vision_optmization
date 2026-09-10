@@ -1,0 +1,11 @@
+measurement	model	output_shape	output_bytes	value	unit
+trtexec_engine	yolov8s	1x84x8400	2822400	1023.26	qps
+trtexec_engine	yolov8s_nms	1x300x6	7200	833.38	qps
+grpc_roundtrip_r1	yolov8s	1x84x8400	2822400	258.9	fps
+grpc_roundtrip_r2	yolov8s	1x84x8400	2822400	255.1	fps
+grpc_roundtrip_r3	yolov8s	1x84x8400	2822400	264.6	fps
+grpc_roundtrip_r1	yolov8s_nms	1x300x6	7200	350.9	fps
+grpc_roundtrip_r2	yolov8s_nms	1x300x6	7200	344.7	fps
+grpc_roundtrip_r3	yolov8s_nms	1x300x6	7200	339.6	fps
+grpc_lat_p50_r1	yolov8s	1x84x8400	2822400	3.789	ms
+grpc_lat_p50_r1	yolov8s_nms	1x300x6	7200	2.816	ms
