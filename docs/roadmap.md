@@ -30,9 +30,12 @@ ultralytics end-to-end on the same images and thresholds.
   bilinearly, verified to match `cv2.INTER_LINEAR` exactly, at a cost of
   +0.0085 ms/frame (~0.6% of frame time).
 
-**Still open:** only 500 of 5000 images, only YOLOv8s, and the comparison is
-chain-vs-chain so it does not decompose preprocessing / precision / NMS
-individually.
+Extended since to **all three models and both engine shapes** - every one lands
+within +/-0.16% of its PyTorch reference, and the batch-8 engines match batch-1
+within +/-0.26%, so dynamic batching costs no accuracy either.
+
+**Still open:** 500 of 5000 images, and the comparison is chain-vs-chain so it
+does not decompose preprocessing / precision / NMS individually.
 
 ### INT8 quantization — ⚠️ speed ceiling measured, result still blocked
 
