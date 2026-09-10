@@ -227,8 +227,10 @@ docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_pipeline_cuda --e
 docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_grpc_cuda --mode file --file frames.bin --model yolov8s --streams 1 --duration 10'
 # C2: Python numpy + sys-shm + processes
 docker exec triton-server bash -c 'cd /work && python3 client_v2.py --mode file --file cpp/build/frames.bin --model yolov8s --transfer sys --streams 4 --processes 4 --duration 8'
-# D: async + dynamic batching
+# D: async + dynamic batching (single model)
 docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_grpc_async --model yolov8s_dyn --file frames.bin --streams 8 --duration 10'
+# D multi-model (Triton production scenario, 3 models x async batching)
+docker exec triton-server bash -c 'cd /work/cpp/build && ./trt_grpc_async --models yolov8n_dyn,yolov8s_dyn,yolo11n_dyn --file frames.bin --streams 18 --duration 10'
 # E: DeepStream (ds-build container)
 docker exec ds-build bash -c 'cd /tmp && ./ds_bench --config /opt/ds/model/yolov8s/config_infer_primary_yolov8s.txt --streams 1 --batch 1 --duration 15'
 ```

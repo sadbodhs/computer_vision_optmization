@@ -1,0 +1,11 @@
+name: "yolo11n_dyn"
+platform: "tensorrt_plan"
+default_model_filename: "model.plan"
+max_batch_size: 8
+dynamic_batching {
+  preferred_batch_size: [ 4, 8 ]
+  max_queue_delay_microseconds: 5000
+}
+instance_group [ { count: 2 kind: KIND_GPU } ]
+input [ { name: "images" data_type: TYPE_FP32 dims: [ 3, 640, 640 ] } ]
+output [ { name: "output0" data_type: TYPE_FP32 dims: [ 84, 8400 ] } ]
