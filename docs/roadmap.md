@@ -37,21 +37,16 @@ within +/-0.26%, so dynamic batching costs no accuracy either.
 **Still open:** 500 of 5000 images, and the comparison is chain-vs-chain so it
 does not decompose preprocessing / precision / NMS individually.
 
-### INT8 quantization — ⚠️ speed ceiling measured, result still blocked
+### INT8 quantization - measured, question closed
 
-Bound established in [precision](precision.md): **+33.6% (YOLOv8s), +19.4%
-(YOLOv8n)** for uncalibrated INT8 — the upper bound, not a result. Notably that is
-less than the "2×" folklore, and on YOLOv8n it is *beaten* by CUDA graphs, which
-costs no accuracy.
+Calibrated engine built and scored: **+32.8% throughput (1023 -> 1359 qps) for
+-1.55 mAP50-95**, and it *dominates* the alternative of downgrading to a smaller
+model (+22.5% for -5.79 points). See [precision](precision.md).
 
-**Accuracy axis now exists** ([accuracy](accuracy.md)), and a calibrated engine
-has been built (`scripts/build_int8_engine.py`, MinMax over 250 COCO batches,
-14.6 MB vs FP16's 25.6 MB). It still cannot be *served*: TensorRT engines are
-locked to the exact build that produced them, ultralytics pip-installs its own
-TensorRT to export, and neither `tensorrt_cu13` 11.3 nor a pinned
-`tensorrt==10.7.0.post1` matches the container's native 10.7.0.23. The remaining
-work is to calibrate against the native library instead of a pip-installed one -
-an engineering step, not an open question. See [precision](precision.md).
+Building it needed a two-stage route, because ultralytics pip-installs its own
+TensorRT and engines are locked to the exact build that made them: let ultralytics
+calibrate, keep its portable calibration cache, then rebuild with the container's
+own trtexec. `scripts/build_int8_engine.py` does both.
 
 ### Structured sparsity (2:4) — ✅ measured, and closed
 

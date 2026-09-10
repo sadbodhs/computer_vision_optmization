@@ -59,39 +59,67 @@ The practical order of operations follows: **remove launch overhead first, then
 consider quantization.** Reaching for INT8 before graphs means paying an accuracy
 bill for throughput that was available for free.
 
-## Calibrated INT8: built, but blocked on a TensorRT version lock
+## Calibrated INT8: the actual result
 
-With the [accuracy harness](accuracy.md) in place the obvious next step was to
-score a *calibrated* engine and convert the ceiling above into a real trade.
+The ceiling above is uncalibrated, so it is a bound, not a result. Here is the
+real one — a properly calibrated engine, scored on the same 500 COCO images
+against the same reference as everything in [accuracy](accuracy.md):
 
-The engine builds correctly — [`scripts/build_int8_engine.py`](../scripts/build_int8_engine.py)
-runs MinMax calibration over 250 batches of COCO val images (the same
-preprocessing the flows use) and produces a **14.6 MB** engine versus FP16's
-25.6 MB, which is the expected shrink for genuine INT8 weights.
+| | FP16 | **INT8 (calibrated)** | Δ |
+|---|---|---|---|
+| Throughput (`trtexec`) | 1023.26 qps | **1358.72 qps** | **+32.8%** |
+| mAP50-95 | 0.47348 | **0.45794** | **−1.55 points (−3.3%)** |
+| mAP50 | 0.64524 | 0.63192 | −1.33 points |
+| Engine size | 25.6 MB | 14.25 MB | −44% |
 
-**It cannot be served.** Triton rejects it:
+**+32.8% throughput for 1.55 mAP points.** Whether that is a good trade is a
+deployment question, but it is now a question with numbers on both sides.
 
-```
-IRuntime::deserializeCudaEngine: Error Code 1: Serialization
-(Serialization assertion plan->header.magicTag == rt::kPLAN_MAGIC_TAG failed.
- Trying to load an engine created with incompatible serialization version.)
-```
+Note the calibrated engine lands within 0.4% of the *uncalibrated* ceiling
+(1358.7 vs 1363.6 qps) — calibration costs essentially no speed. Everything INT8
+gives you was available in the bound; what calibration buys is the accuracy being
+meaningful rather than garbage.
 
-TensorRT engines are locked to the exact build that produced them. Ultralytics
-pip-installs its own TensorRT to export (`tensorrt_cu13` **11.3** by default), and
-the container serves with the **native 10.7.0.23**. Pinning the pip package to
-`tensorrt==10.7.0.post1` does not fix it either: `10.7.0.post1` and `10.7.0.23`
-are different builds of the same version, and the serialization check is exact.
+### It beats the other way of buying speed
 
-**The fix is to calibrate with the container's own TensorRT** rather than a
-pip-installed one — an `IInt8Calibrator` against the native library (C++, or
-Python bindings built from the same 10.7.0.23 build). That is the next piece of
-work, not a research question.
+The obvious alternative to quantising is downgrading the model. Both bought from
+the same FP16 YOLOv8s baseline:
 
-So the INT8 row remains a **ceiling, not a result**: +33.6% throughput is what it
-could buy, and the mAP it costs is still unmeasured.
+| Route | Throughput | mAP cost |
+|---|---|---|
+| **INT8 on YOLOv8s** | 1023 → 1359 (**+32.8%**) | **−1.55 points** |
+| Switch to YOLO11n (FP16) | 1023 → 1253 (+22.5%) | −5.79 points |
 
-## Still not answered
+**INT8 strictly dominates**: more speed *and* less accuracy lost. If you were
+about to drop to a smaller model for throughput, quantise the bigger one instead.
+
+And stacked against the free lever: [CUDA graphs](cuda-graphs.md) give +14.9% at
+**zero** accuracy cost. The order of operations is therefore graphs first, then
+INT8, then model choice last.
+
+### How it was built
+
+Not the obvious way. `ultralytics export(int8=True)` produces a correctly
+calibrated engine that Triton cannot load — TensorRT engines are locked to the
+exact build that produced them, ultralytics pip-installs its own TensorRT
+(`tensorrt_cu13` 11.3), and the container serves native 10.7.0.23. Pinning the pip
+package to `10.7.0.post1` does not help either: `post1` and `10.7.0.23` are
+different builds and the check is exact.
+
+The working route is two-stage, and
+[`scripts/build_int8_engine.py`](../scripts/build_int8_engine.py) runs both:
+
+1. **ultralytics calibrates.** Keep its calibration *cache* — a text file of
+   per-tensor scales, portable across builds of the same TensorRT version — and
+   its intermediate ONNX. Discard its engine.
+2. **the container's own `trtexec` rebuilds** from that ONNX and cache:
+   `--onnx=<int8 onnx> --int8 --fp16 --calib=<cache>`. The `--fp16` is required;
+   the ultralytics ONNX carries fp16 layer precisions and the builder rejects the
+   network without it.
+
+The engine that comes out loads in Triton and is what the table above measures.
+
+## Still not answered## Still not answered
 - **Sparsity with retraining.** Not attempted, and finding 2 argues it is not
   worth attempting on this workload.
 - **INT8 through the pipelines.** These are `trtexec` engine measurements; no A2/B2/D

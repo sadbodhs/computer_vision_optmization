@@ -9,3 +9,4 @@ triton_yolov8s_dyn	tensorrt_fp16_b8	linear	500	0.001	0.45	0.47367	0.64576	0.5122
 triton_yolov8n_dyn	tensorrt_fp16_b8	linear	500	0.001	0.45	0.39315	0.55745	0.42356	30976
 triton_yolo11n_dyn	tensorrt_fp16_b8	linear	500	0.001	0.45	0.41465	0.58223	0.45097	28986
 triton_yolov8s_nearest	tensorrt_fp16_b1	nearest	500	0.001	0.45	0.46782	0.63582	0.51150	26972
+triton_yolov8s_int8	tensorrt_int8_calibrated	linear	500	0.001	0.45	0.45794	0.63192	0.49646	25627

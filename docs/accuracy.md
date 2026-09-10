@@ -112,6 +112,17 @@ images, same thresholds:
 *(mAP50-95; full table including mAP50/mAP75 in
 [`results/v3/accuracy.tsv`](../results/v3/accuracy.tsv))*
 
+**Calibrated INT8**, same images and harness, is the one precision change that
+does cost something measurable:
+
+| YOLOv8s | Throughput | mAP50-95 |
+|---|---|---|
+| FP16 | 1023.26 qps | 0.47348 |
+| **INT8 (calibrated)** | **1358.72 qps (+32.8%)** | **0.45794 (−1.55 points)** |
+
+That trade, and why it beats downgrading the model, is in
+[precision](precision.md#calibrated-int8-the-actual-result).
+
 **Two things fall out.**
 
 **The chain is validated for every architecture, not just the one.** All three land

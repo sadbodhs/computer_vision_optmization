@@ -7,3 +7,4 @@ yolov8n	fp16	1476.54	0.975586	speed only
 yolov8n	fp16_sparse	1501.52	0.964111	speed ceiling - dense weights forced sparse, accuracy invalid
 yolov8n	int8_nocalib	1762.26	0.86792	speed only - NO calibration, accuracy invalid
 yolov8n	best_nocalib	1798.12	0.854858	speed only - NO calibration, accuracy invalid
+yolov8s	int8_calibrated	1358.72		CALIBRATED - real result, see docs/accuracy.md (-1.55 mAP)
