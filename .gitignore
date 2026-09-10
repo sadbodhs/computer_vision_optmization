@@ -3,6 +3,8 @@
 *.engine
 *.onnx
 *.pt
+# INT8 calibration cache — locked to the TensorRT build that produced it
+*.cache
 
 # Preprocessed capacity-replay input — regenerate with scripts/make_frames.sh
 *.bin
