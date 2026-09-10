@@ -1,0 +1,4 @@
+pipeline	engine	resize	images	conf	nms_iou	mAP50_95	mAP50	mAP75	detections
+ultralytics_reference	pytorch_fp32	linear(ultralytics)	500	0.001	0.45	0.47376	0.64535	0.51373	26626
+study_chain	tensorrt_fp16	linear	500	0.001	0.45	0.47348	0.64524	0.51426	26619
+study_chain_as_shipped	tensorrt_fp16	nearest	500	0.001	0.45	0.46782	0.63582	0.51150	26972

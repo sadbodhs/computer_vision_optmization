@@ -15,16 +15,22 @@ it would be tested. Hardware support is verified against the actual rig
 
 ## Tier 1 — the missing axis
 
-### Accuracy (mAP)
+### Accuracy (mAP) - measured
 
-**The structural gap.** Every number in this repo is speed. There is no accuracy
-axis at all, which is defensible only because every flow runs *identical FP16
-weights* — so they are comparable to each other. It stops being defensible the
-moment precision changes: "1.9× faster" is meaningless without "and −x mAP."
+Done: [accuracy](accuracy.md). COCO val2017 (500 images), study chain vs
+ultralytics end-to-end on the same images and thresholds.
 
-*Method*: COCO val2017 subset through each flow, mAP@0.5:0.95 vs the PyTorch
-baseline. This is a prerequisite for everything in the rest of Tier 1, not an
-optional extra.
+- With linear resize the study's chain is **within 0.06% of the PyTorch
+  reference** - the letterbox geometry, FP16 engine, custom class-aware NMS and
+  un-letterboxing math are all validated rather than assumed.
+- **As shipped it uses nearest-neighbour resize**, in the CUDA kernel *and* the
+  numpy client, costing **-1.25% mAP50-95** across A2/B2/C2/D alike. Pure speed
+  benchmarking could never surface this: every flow was equally wrong, so they
+  agreed with each other.
+
+**Still open:** only 500 of 5000 images, only YOLOv8s, and the comparison is
+chain-vs-chain so it does not decompose preprocessing / precision / NMS
+individually.
 
 ### INT8 quantization — ⚠️ speed ceiling measured, result still blocked
 

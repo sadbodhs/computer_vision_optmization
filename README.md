@@ -27,6 +27,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
 | [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
 | [Triton tuning](docs/triton-tuning.md) | Were the Triton knobs right? | `count:2` validated (+30% over 1); graphs and instances are substitutes |
+| [Accuracy](docs/accuracy.md) | Does the pipeline preserve the model? | Yes (−0.06% vs PyTorch) — but nearest-neighbour resize costs every flow ~0.6 mAP |
 | [Precision](docs/precision.md) | What could INT8 / sparsity buy? | INT8 ceiling ~+34%; forced 2:4 sparsity ~+1% (speed only, no accuracy) |
 | [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8; MPS and CUDA graphs now measured |
 
@@ -116,7 +117,7 @@ Details, per-arm commands, and the source→binary map: [Reproduce](docs/reprodu
 ## Scope
 
 This study covers the **serving and transport layer**, at FP16, at 640×640, for
-detection on a single GPU. It has **no accuracy (mAP) axis**, and does not yet
+detection on a single GPU. It now has an [accuracy axis](docs/accuracy.md), and does not yet
 cover in-graph NMS, input-resolution scaling, or application-level tricks like
 detect-and-track. MPS, CUDA graphs and the INT8/sparsity *speed ceilings* have
 since been measured; calibrated INT8 still needs the accuracy axis. Those limits are enumerated

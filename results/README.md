@@ -13,6 +13,7 @@ What each file is, and how it maps to the tables in the top-level README/STORY.
 | `v2/gpu_*.csv`, `gpu_*.csv`, `v3/gpu_*.csv` | v2/v3 | GPU util/mem samples (`scripts/gpu_sample.sh`) taken during runs. |
 | `comparison_tables.md` | v2 | The fair tables (per-frame latency, per-frame GPU cost) + Flow E (DeepStream). |
 | `parallel_contention.md` | v3 | Multi-instance contention study (`scripts/parallel_test.sh`). |
+| `v3/accuracy.tsv` | v3 | COCO val2017 mAP (500 imgs): study chain vs ultralytics reference (`scripts/accuracy_eval.py`, `scripts/accuracy_reference.py`). |
 | `v3/triton_knobs.tsv` | v3 | `instance_group count` x CUDA graphs sweep on B2 (`scripts/triton_knobs.sh`), 3 repeats per cell. |
 | `v3/precision_ceilings.tsv` | v3 | INT8 / sparsity **speed ceilings** (`scripts/precision_ceilings.sh`). Throughput only — INT8 built without calibration, accuracy invalid. |
 | `v3/cuda_graphs.tsv` | v3 | CUDA Graphs A/B across all three engines (`scripts/cuda_graphs.sh`), 3 repeats per cell. |
