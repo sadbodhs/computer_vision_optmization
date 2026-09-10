@@ -8,6 +8,19 @@ Hardware: RTX 3090 · Triton 24.12 · TensorRT 10.7/10.3 · DeepStream 7.1 ·
 3× YOLO FP16 engines @ 640×640 (identical ONNX, md5-verified across flows).
 Everything runs in Docker.
 
+## Model card (the exact model every flow runs)
+
+| Item | Value |
+|---|---|
+| **Model** | YOLOv8s (Ultralytics), COCO 80 classes |
+| **Input** | 640×640, RGB, normalized /255 (sigmoid baked into export) |
+| **Precision** | FP16 engines (built from the same ONNX per TRT version) |
+| **Engine format** | `.plan` (Triton) / `.engine` (DeepStream) — same serialization, different naming |
+| **Output** | `[1, 84, 8400]` = 4 box + 80 class scores, conf 0.25, class-aware NMS IoU 0.45 |
+| **Also tested** | YOLOv8n (1490 qps) · YOLO11n (1259 qps) for multi-model runs |
+| **Source files** | `triton/models/*/model.onnx` — the single source of truth, md5 `0fa8a042…` |
+| **Preproc contract** | centered letterbox, pad 114, BGR→RGB, /255 — identical in every flow |
+
 ---
 
 ## 1. The contenders (naming used everywhere in this repo)
@@ -41,6 +54,12 @@ the batch-8 engine = 4.84 ms/8 frames = **0.61 ms/frame (1630 fps effective)**.
 ---
 
 ## 2. Capacity results
+
+**Flow key** (details in Section 1): **A1** C++ TRT, CPU path · **A2** C++ TRT,
+full-CUDA zero-copy · **B1** Triton + C++ client, raw gRPC · **B2** Triton + C++
+client, CUDA shm · **C1** Triton + Python torch *(superseded)* · **C2** Triton +
+Python numpy, sys-shm · **D** Triton async in-flight + batch-8 engines ·
+*(E = DeepStream, see its own section)*. All run the **same YOLOv8s FP16 model**.
 
 Two numbers per cell. **`fps↑` = throughput (higher is better) · `ms↓` = per-frame
 latency p50 (lower is better)**. Best value per row is **bold**.
