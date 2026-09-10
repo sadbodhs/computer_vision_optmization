@@ -11,6 +11,8 @@ What each file is, and how it maps to the tables in the top-level README/STORY.
 | `*_single_*.json`, `*_3stream_*.json` | **v1 (flawed)** | The first, source-capped pass (STORY §3). Kept for honesty. `latency_ms_est` here is `1000/fps`, a derived reciprocal — **not** a measured p50. Do not cite these as pipeline capacity. |
 | `v2/all_*.tsv` | **v2 (corrected)** | The 4-arm capacity + RTSP sweep from `scripts/benchmark_v2.sh`. One JSON per repeat, `arm|json`. |
 | `v2/gpu_*.csv`, `gpu_*.csv`, `v3/gpu_*.csv` | v2/v3 | GPU util/mem samples (`scripts/gpu_sample.sh`) taken during runs. |
+| `capacity_table.tsv` | — | The canonical capacity numbers (flow × concurrency → fps, latency) as data, so `scripts/make_plots.py` can regenerate the figures. Mirrors the table in `docs/results.md`. |
+| `stage_decomposition.tsv` | — | Per-stage per-frame times behind the stage-decomposition figure. |
 | `comparison_tables.md` | v2 | The fair tables (per-frame latency, per-frame GPU cost) + Flow E (DeepStream). |
 | `parallel_contention.md` | v3 | Multi-instance contention study (`scripts/parallel_test.sh`). |
 | `v3/accuracy.tsv` | v3 | COCO val2017 mAP (500 imgs): study chain vs ultralytics reference (`scripts/accuracy_eval.py`, `scripts/accuracy_reference.py`). |

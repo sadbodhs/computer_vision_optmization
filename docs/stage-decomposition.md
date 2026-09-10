@@ -7,6 +7,13 @@ Per-stage wall time for one frame, measured inside each flow with per-stage time
 
 ---
 
+![Stacked per-frame time for A2, B2 and C2](img/stage-decomposition.png)
+
+A2 and B2 are nearly the same bar — that is the point. Giving Triton zero-copy
+buffers collapses the framework's cost to ~0.02 ms of the total. C2's bar is five
+times longer, and the extra length is all client-side: gRPC serialisation plus
+numpy NMS, not GPU work.
+
 ## Capacity mode (preprocessed frames, no decode — pure pipeline cost)
 
 | Stage | A2 (C++ TRT) | B2 (Triton, CUDA shm) | C2 (Python numpy) |

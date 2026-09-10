@@ -8,6 +8,15 @@ All flows run the **same YOLOv8s FP16 model**. Flow IDs are defined in the
 
 ---
 
+![Latency versus throughput for every flow, swept over concurrency 1-16](img/pareto-latency-throughput.png)
+
+*The whole study in one plot.* Up and to the left is better. **A2** reaches the
+top-left corner — lowest latency at high throughput. **D** climbs highest but
+walks right as it does: its throughput is bought with queue wait, and past
+concurrency 4 it crosses the 30 FPS frame budget. The grey flows (A1/B1/C1) are
+dominated everywhere — they are what "just use the server" or "just use Python"
+costs if you feed them naively.
+
 ## Capacity results
 
 Two numbers per cell. **`fps↑` = throughput (higher is better) · `ms↓` = per-frame
@@ -33,6 +42,13 @@ batch-1 engine cannot exceed its 1028 qps core for long.
 2 camera frames at 30 FPS. See [batching](batching.md).
 
 GPU util at conc=16: A2 81% · B2 84% · C2 82% · D 79% (Triton-without-shm was 52%).
+
+![Throughput against concurrency for each flow](img/concurrency-scaling.png)
+
+Read against the dashed engine cap: **A2 plateaus immediately** (it is at its
+ceiling by concurrency 2 and never improves), while **D keeps climbing** because
+batching amortises the GPU pass across 8 frames. B2 tracks A2 about 60 fps
+behind. Everything below the cap line is losing to the engine, not to the GPU.
 
 ## Latency-first view (live 30 FPS camera: budget = 33.3 ms/frame)
 

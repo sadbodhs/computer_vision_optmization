@@ -11,6 +11,11 @@ Everything runs in Docker.
 **New here?** Read [STORY.md](STORY.md) — the narrative of how the first answer
 turned out to be wrong, and what it took to get a trustworthy one.
 
+![Latency versus throughput for every flow](docs/img/pareto-latency-throughput.png)
+
+*Up and to the left is better.* Each line is one pipeline swept over concurrency
+1–16. Full tables in [Results](docs/results.md).
+
 ---
 
 ## Index

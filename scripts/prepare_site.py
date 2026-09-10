@@ -61,6 +61,13 @@ for name in sorted(os.listdir(os.path.join(REPO, "docs"))):
     open(os.path.join(OUT, name), "w", encoding="utf-8").write(link_re.sub(fix_docs_link, text))
     n += 1
 
+# non-markdown assets under docs/ (figures) must come along, or they 404
+for sub in ("img",):
+    src_dir = os.path.join(REPO, "docs", sub)
+    if os.path.isdir(src_dir):
+        shutil.copytree(src_dir, os.path.join(OUT, sub))
+        print(f"copied docs/{sub}/")
+
 # README.md -> index.md
 readme = open(os.path.join(REPO, "README.md"), encoding="utf-8").read()
 open(os.path.join(OUT, "index.md"), "w", encoding="utf-8").write(link_re.sub(fix_readme_link, readme))
