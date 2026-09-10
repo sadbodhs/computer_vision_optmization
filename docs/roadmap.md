@@ -63,20 +63,20 @@ the projected headroom for A2, not a measurement. Triton's own
 `optimization { cuda { graphs: true } }` is also untested for B2/D, and
 fixed-shape capture complicates the dynamic-batch engines used by D.
 
-### CUDA MPS — ✅ measured (A2), partially open (B2)
+### CUDA MPS - measured for both flows, question closed
 
-Done, and it changed the study. See
-[contention → MPS](contention.md#mps-changes-two-of-those-conclusions).
-A2 at N=3: latency growth **+148% → +97%**, total throughput **960 → 1266 fps**,
-which is **24% above the batch-1 engine cap** — so "throughput plateaus at the
-engine cap" was a time-slicing artifact, not a hardware ceiling. Solo performance
-is unaffected.
+Done: [contention](contention.md). At N=3, MPS gives **A2 +32.3% fps / -20.9%
+latency** but **B2 only +1.7% fps and +20.3% *worse* latency** - because B2's GPU
+work all happens inside one server process, so there are no competing CUDA
+contexts for MPS to multiplex.
 
-**Still open:** B2 under MPS. An MPS client must share the daemon's uid, and while
-a daemon runs, any CUDA process that cannot reach it fails with `error 805` —
-including the root-owned `triton-server`. Closing this needs either a root MPS
-daemon (requires sudo on the host) or a non-root Triton container. Until then the
-symmetric A2+MPS vs B2+MPS comparison is missing.
+Consequences: "throughput plateaus at the engine cap" is false (A2 reaches 1259
+fps against a 1023 qps cap); Triton's contention advantage is real *only* against
+MPS-less processes and inverts once MPS is on; and MPS should **not** be enabled
+for a Triton deployment.
+
+B2 was measured by running Triton as non-root - an MPS client must share the
+daemon's uid, and a root server cannot reach a user-owned daemon (`error 805`).
 
 ### In-graph NMS (`EfficientNMS_TRT`)
 

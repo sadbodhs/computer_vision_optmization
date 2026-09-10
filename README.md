@@ -21,7 +21,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Results](docs/results.md) | How fast is each pipeline? | A2 lowest latency (1.23 ms); D highest throughput (1665 fps) |
 | [Transport](docs/transport.md) | Which shared memory, and when? | CPU data → sys-shm (3.6×); GPU data → CUDA IPC (3×) |
 | [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms queue wait |
-| [Contention](docs/contention.md) | What if N pipelines share the GPU? | Latency grows ~linearly — but CUDA MPS nearly halves the penalty and beats the "engine cap" |
+| [Contention](docs/contention.md) | What if N pipelines share the GPU? | MPS gives A2 +32% but B2 nothing — Triton's edge inverts once MPS is on |
 | [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
 | [DeepStream](docs/deepstream.md) | What does NVIDIA's own stack do? | 1.50 ms/frame, zero custom code, source-bound at 5.4% GPU |
 | [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |

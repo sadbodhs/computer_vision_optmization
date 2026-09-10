@@ -7,6 +7,12 @@
 # N=3. That was measured with MPS OFF -- and inter-process context-switch
 # serialization is exactly what MPS removes. This script tests that.
 #
+# Covers BOTH flows:
+#   A2 - N independent in-process TensorRT pipelines (N CUDA contexts)
+#   B2 - N gRPC clients against ONE Triton server (server holds the CUDA context)
+# The contrast is the whole point: MPS multiplexes separate processes, and Triton
+# already avoids having separate processes to multiplex.
+#
 # Usage: scripts/mps_contention.sh [duration] [N]
 #
 # IMPORTANT -- two constraints this script works around:
@@ -32,6 +38,18 @@ CONTAINER=${CONTAINER:-triton-server}
 export CUDA_MPS_PIPE_DIRECTORY=${CUDA_MPS_PIPE_DIRECTORY:-/tmp/nvidia-mps}
 export CUDA_MPS_LOG_DIRECTORY=${CUDA_MPS_LOG_DIRECTORY:-/tmp/nvidia-mps-log}
 UID_GID="$(id -u):$(id -g)"
+
+cleanup() {
+  echo "--- cleanup: removing test server, stopping MPS, restoring $CONTAINER ---" >&2
+  docker rm -f triton-mps-test > /dev/null 2>&1 || true
+  # a leftover MPS daemon makes every root CUDA container fail with error 805
+  if pgrep -f nvidia-cuda-mps-control > /dev/null 2>&1; then
+    echo quit | nvidia-cuda-mps-control > /dev/null 2>&1 || true
+    sleep 2
+  fi
+  docker start $CONTAINER > /dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
 
 # --- stage engine + binary + frames.bin somewhere the uid can read -----------
 mkdir -p "$STAGE" "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
@@ -59,40 +77,96 @@ run_batch() {  # run_batch <label> <extra docker args...>
   done
 }
 
+# --- B2: N gRPC clients against one non-root Triton server ------------------
+# The server must run --user <uid> too: an MPS client must share the daemon's uid,
+# and a root server cannot reach a user-owned daemon (error 805).
+start_nonroot_server() {  # start_nonroot_server <extra docker args...>
+  docker rm -f triton-mps-test > /dev/null 2>&1 || true
+  docker run -d --name triton-mps-test --gpus all --shm-size=2g --network host \
+    --user "$UID_GID" "$@" -v "$ROOT/triton/models:/models" -v "$STAGE:/data" \
+    "$IMAGE" tritonserver --model-repository=/models > /dev/null
+  for i in $(seq 1 45); do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/v2/health/ready 2>/dev/null)" = "200" ] && return 0
+    sleep 2
+  done
+  return 1
+}
+
+run_b2() {  # run_b2 <label>
+  local LABEL=$1
+  docker exec triton-mps-test bash -c "
+    cd /work/cpp/build
+    for i in \$(seq $N); do
+      ./trt_grpc_cuda --mode file --file /data/frames.bin --model yolov8s \
+        --streams 1 --duration $DURATION > /tmp/b\$i.json 2>/dev/null &
+    done
+    wait
+    for i in \$(seq $N); do tail -1 /tmp/b\$i.json; done
+  " 2>/dev/null | while read -r line; do
+    case "$line" in
+      \{*) echo -e "${LABEL}\t${line}" | tee -a "$OUTF" ;;
+    esac
+  done
+}
+
 echo -e "condition\tjson" > "$OUTF"
 
 echo "=== MPS OFF (N=$N, ${REPEATS} repeats) ==="
-for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_batch "mps_off"; done
+for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_batch "a2_mps_off"; done
 
-echo "=== starting MPS daemon (stopping $CONTAINER: it cannot reach the daemon) ==="
+echo "=== B2 MPS OFF (non-root server, N=$N) ==="
 docker stop $CONTAINER > /dev/null 2>&1 || true
+if start_nonroot_server; then
+  for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_b2 "b2_mps_off"; done
+else echo "b2 server failed to start (MPS off)" >&2; fi
+docker rm -f triton-mps-test > /dev/null 2>&1 || true
+
+echo "=== starting MPS daemon ($CONTAINER stays down: it cannot reach the daemon) ==="
 nvidia-cuda-mps-control -d
 sleep 2
 
+echo "=== B2 MPS ON (non-root server, N=$N) ==="
+MPS_ARGS=(--ipc=host
+  -e CUDA_MPS_PIPE_DIRECTORY="$CUDA_MPS_PIPE_DIRECTORY"
+  -e CUDA_MPS_LOG_DIRECTORY="$CUDA_MPS_LOG_DIRECTORY"
+  -v "$CUDA_MPS_PIPE_DIRECTORY:$CUDA_MPS_PIPE_DIRECTORY"
+  -v "$CUDA_MPS_LOG_DIRECTORY:$CUDA_MPS_LOG_DIRECTORY")
+if start_nonroot_server "${MPS_ARGS[@]}"; then
+  for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_b2 "b2_mps_on"; done
+else echo "b2 server failed to start (MPS on)" >&2; fi
+docker rm -f triton-mps-test > /dev/null 2>&1 || true
+
 echo "=== MPS ON (N=$N, ${REPEATS} repeats) ==="
-for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_batch "mps_on" --ipc=host \
+for r in $(seq $REPEATS); do echo "-- repeat $r --"; run_batch "a2_mps_on" --ipc=host \
   -e CUDA_MPS_PIPE_DIRECTORY="$CUDA_MPS_PIPE_DIRECTORY" \
   -e CUDA_MPS_LOG_DIRECTORY="$CUDA_MPS_LOG_DIRECTORY" \
   -v "$CUDA_MPS_PIPE_DIRECTORY:$CUDA_MPS_PIPE_DIRECTORY" \
   -v "$CUDA_MPS_LOG_DIRECTORY:$CUDA_MPS_LOG_DIRECTORY"; done
 
 echo "=== stopping MPS daemon and restoring $CONTAINER ==="
+docker rm -f triton-mps-test > /dev/null 2>&1 || true
 echo quit | nvidia-cuda-mps-control || true
 sleep 2
 docker start $CONTAINER > /dev/null 2>&1 || true
 
 echo "=== saved to $OUTF ==="
-python3 - "$OUTF" <<'PY'
+python3 - "$OUTF" <<'PYEOF'
 import json, sys, statistics, collections
 rows = collections.defaultdict(list)
 for line in open(sys.argv[1]):
     cond, _, js = line.strip().partition("\t")
     if js.startswith("{"):
-        d = json.loads(js); rows[cond].append((d["fps"], d["lat_ms_p50"]))
-n = None
-for cond in ("mps_off", "mps_on"):
-    if cond not in rows: continue
-    v = rows[cond]
-    print(f"{cond}: instances={len(v)}  total_fps~{sum(f for f,_ in v)/ (len(v)//3 or 1):.1f}  "
-          f"lat_p50 median={statistics.median(l for _,l in v):.3f} ms")
-PY
+        d = json.loads(js)
+        rows[cond].append((d["fps"], d["lat_ms_p50"]))
+hdr = "%-13s %9s %11s %12s" % ("condition", "instances", "total_fps", "lat_p50_ms")
+print(hdr)
+for cond in ("a2_mps_off", "a2_mps_on", "b2_mps_off", "b2_mps_on"):
+    v = rows.get(cond)
+    if not v:
+        print("%-13s %9s" % (cond, "(no data)"))
+        continue
+    totals = [sum(f for f, _ in v[i:i + 3]) for i in range(0, len(v), 3)]
+    print("%-13s %9d %11.1f %12.3f" % (
+        cond, len(v), statistics.median(totals),
+        statistics.median(l for _, l in v)))
+PYEOF
