@@ -1,5 +1,7 @@
 # Docker — rebuild and run everything from the repo
 
+[← index](../README.md)
+
 Every arm runs in a container; nothing is installed on the host. Previously the
 containers were only recoverable from committed images (`triton-bench:v3`,
 `ds-build`). These Dockerfiles rebuild them from source, so the repo alone is

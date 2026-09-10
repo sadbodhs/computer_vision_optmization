@@ -1,5 +1,7 @@
 # results/ — provenance
 
+[← index](../README.md)
+
 What each file is, and how it maps to the tables in the top-level README/STORY.
 
 ## Layout

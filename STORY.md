@@ -4,6 +4,10 @@
 pipeline, discovered that our first answer was wrong, rebuilt everything,
 and ended up with numbers we can actually trust.*
 
+[← index](README.md) · This is the narrative. For the tables and the per-topic
+analysis, start at the [index](README.md#index); for the rules that make these
+numbers trustworthy, see [Methodology](docs/methodology.md).
+
 ---
 
 ## 1. The question
