@@ -97,10 +97,54 @@ recovery**. At 30 fps it is 0.03% of the 33.3 ms budget.
 > kernels) because that mode is source-bound and the stream drops frames. The
 > per-stage timer is the measurement; the throughput column is noise.
 
+## 4. Every scenario, not just YOLOv8s
+
+The result above was one model. Repeated across all three architectures and both
+engine shapes (batch-1 and the batch-8 `_dyn` engines flow D uses), same 500
+images, same thresholds:
+
+| Model | reference (PyTorch) | study chain (TRT FP16 b1) | Δ | `_dyn` (TRT FP16 b8) | Δ vs b1 |
+|---|---|---|---|---|---|
+| YOLOv8s | 0.47376 | **0.47348** | −0.06% | 0.47367 | +0.04% |
+| YOLOv8n | 0.39274 | **0.39212** | −0.16% | 0.39315 | +0.26% |
+| YOLO11n | 0.41510 | **0.41554** | +0.11% | 0.41465 | −0.21% |
+
+*(mAP50-95; full table including mAP50/mAP75 in
+[`results/v3/accuracy.tsv`](../results/v3/accuracy.tsv))*
+
+**Two things fall out.**
+
+**The chain is validated for every architecture, not just the one.** All three land
+within ±0.16% of their PyTorch reference, and the deltas scatter in both
+directions — which is what noise looks like, rather than a systematic loss.
+
+**Dynamic batching is free on the accuracy axis.** The batch-8 engines match their
+batch-1 counterparts within ±0.26%, again scattering both ways. So
+[flow D](batching.md)'s throughput win costs queue latency and *nothing else* —
+worth knowing, because "does batching change my detections?" is a reasonable thing
+to suspect and the answer here is no.
+
+## 5. Speed and accuracy together, per model
+
+The study compares the three models on throughput alone, which is only half the
+picture. With the accuracy axis, the actual trade:
+
+| Model | `trtexec` batch-1 | mAP50-95 | vs YOLOv8n |
+|---|---|---|---|
+| YOLOv8n | **1490 qps** | 0.39212 | — |
+| YOLO11n | 1253 qps (−16%) | 0.41554 | **+2.3 mAP points** |
+| YOLOv8s | 1023 qps (−31%) | **0.47348** | **+8.1 mAP points** |
+
+**YOLO11n is the interesting one**: it buys +2.3 mAP points for 16% throughput,
+a better exchange rate than YOLOv8s offers (+8.1 points for 31%). If you are
+picking a model on the strength of the fps tables elsewhere in this study, this is
+the column those tables were missing.
+
 ## Caveats
 
-- **500 images, not the full 5000.** Enough to resolve a 1.25% gap, not enough for
-  a headline "YOLOv8s scores X" claim. The absolute numbers here run above
+- **500 images, not the full 5000.** Enough to resolve a 1.25% gap and to tell
+  models apart by 2+ points, but not enough for a headline "YOLOv8s scores X"
+  claim, and not enough to call sub-0.3% deltas anything but noise. The absolute numbers here run above
   ultralytics' published 44.9 partly for that reason and partly because NMS IoU is
   0.45 (the flows' value) rather than ultralytics' 0.7 default.
 - **The comparison is chain-vs-chain**, so it bundles preprocessing, engine
@@ -108,7 +152,6 @@ recovery**. At 30 fps it is 0.03% of the 33.3 ms budget.
   individually hurts; it does not decompose them.
 - Measured at `conf 0.001` (the mAP convention). The flows *deploy* at `conf 0.25`,
   which is an operating-point choice and not what mAP measures.
-- Only YOLOv8s.
 
 ## What this unblocks
 

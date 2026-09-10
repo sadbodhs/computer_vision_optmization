@@ -69,7 +69,7 @@ frame **waits 6.2 ms** for its batch to fill, then the GPU **services it in
 | **Precision** | FP16 engines from the same ONNX (md5-verified) |
 | **Engine format** | `.plan` (Triton) / `.engine` (DeepStream) — same serialization |
 | **Output** | `[1, 84, 8400]`, conf 0.25, class-aware NMS IoU 0.45 |
-| **Also tested** | YOLOv8n (1490 qps) · YOLO11n (1259 qps) |
+| **Also tested** | YOLOv8n (1490 qps, 0.392 mAP) · YOLO11n (1259 qps, 0.416 mAP) — see [accuracy](accuracy.md#5-speed-and-accuracy-together-per-model) |
 | **Preproc contract** | centered letterbox, pad 114, BGR→RGB, /255 — identical in every flow |
 
 The single implementation of this contract is

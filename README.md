@@ -32,7 +32,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
 | [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
 | [Triton tuning](docs/triton-tuning.md) | Were the Triton knobs right? | `count:2` validated (+30% over 1); graphs and instances are substitutes |
-| [Accuracy](docs/accuracy.md) | Does the pipeline preserve the model? | Yes (−0.06% vs PyTorch) — but nearest-neighbour resize costs every flow ~0.6 mAP |
+| [Accuracy](docs/accuracy.md) | Does the pipeline preserve the model? | Yes, for every model and both engine shapes; batching is accuracy-free; nearest-neighbour resize cost ~0.6 mAP (fixed) |
 | [Precision](docs/precision.md) | What could INT8 / sparsity buy? | INT8 ceiling ~+34%; forced 2:4 sparsity ~+1% (speed only, no accuracy) |
 | [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8; MPS and CUDA graphs now measured |
 
