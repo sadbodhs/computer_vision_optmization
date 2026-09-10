@@ -24,11 +24,13 @@ run_arm() { # run_arm <name> <docker-cmd-string>
 }
 
 D=/work/cpp/build
-echo "=== Benchmark v2.1: duration=${DURATION}s repeats=$REPEATS ==="
+echo "=== Benchmark v2.2: duration=${DURATION}s repeats=$REPEATS ==="
 
 # 0) trtexec engine caps
+# trtexec prints "[<ts>] [I] Throughput: 1028.35 qps", so take the field AFTER the
+# "Throughput:" label — a fixed column index picks up the "[I]" log-level tag.
 for m in yolov8n yolov8s yolo11n; do
-  T=$(docker_exec "/usr/src/tensorrt/bin/trtexec --loadEngine=/models/$m/1/model.plan --warmUp=200 --duration=3 2>/dev/null | grep 'Throughput:' | head -1 | awk '{print \$2}'")
+  T=$(docker_exec "/usr/src/tensorrt/bin/trtexec --loadEngine=/models/$m/1/model.plan --warmUp=200 --duration=3 2>/dev/null | grep 'Throughput:' | head -1 | awk '{for(i=1;i<=NF;i++) if(\$i==\"Throughput:\"){print \$(i+1); exit}}'")
   echo "trtexec_$m|{\"cap_qps\":$T}" >> $OUTF
   echo "[trtexec_$m] cap_qps=$T"
 done

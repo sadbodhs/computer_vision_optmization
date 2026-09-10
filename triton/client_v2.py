@@ -125,10 +125,13 @@ def worker(rank, args, urls, models, q):
                 client.unregister_system_shared_memory(f"pout_{run_tag}_{uid}")
             except Exception:
                 pass
-            shm_in_h = shm.create_shared_memory_region(f"pin_{run_tag}_{uid}", f"/pin_{idx}", IN_BYTES)
-            shm_out_h = shm.create_shared_memory_region(f"pout_{run_tag}_{uid}", f"/pout_{idx}", OUT_BYTES)
-            client.register_system_shared_memory(f"pin_{run_tag}_{uid}", f"/pin_{idx}", IN_BYTES)
-            client.register_system_shared_memory(f"pout_{run_tag}_{uid}", f"/pout_{idx}", OUT_BYTES)
+            # The shm KEY carries run_tag too: "/pin_{idx}" is derived from the stream
+            # index alone, so consecutive runs reuse the same keys and a stale
+            # registration from the previous run poisons this one.
+            shm_in_h = shm.create_shared_memory_region(f"pin_{run_tag}_{uid}", f"/pin_{run_tag}_{idx}", IN_BYTES)
+            shm_out_h = shm.create_shared_memory_region(f"pout_{run_tag}_{uid}", f"/pout_{run_tag}_{idx}", OUT_BYTES)
+            client.register_system_shared_memory(f"pin_{run_tag}_{uid}", f"/pin_{run_tag}_{idx}", IN_BYTES)
+            client.register_system_shared_memory(f"pout_{run_tag}_{uid}", f"/pout_{run_tag}_{idx}", OUT_BYTES)
 
         if args.mode == "file":
             n = frames_np.shape[0]
@@ -173,38 +176,63 @@ def worker(rank, args, urls, models, q):
                 dets += postprocess_np(out)
                 frames += 1
                 fi = (fi + 1) % n
-    else:
-        src_w, src_h = get_resolution(url)
-        dec_times, pre_times = [], []
-        prev_t = 0.0
-        for nv12 in decode_stream(url, src_w, src_h):
-            if time.perf_counter() - t0 > args.duration:
-                break
-            t_dec_end = time.perf_counter()
-            tensor = letterbox_nv12_np(np.frombuffer(nv12, dtype=np.uint8), src_w, src_h)
-            t_pre_end = time.perf_counter()
-            ts = time.perf_counter()
-            inp = [grpcclient.InferInput("images", [1, 3, IMG, IMG], "FP32")]
-            inp[0].set_data_from_numpy(tensor)
-            out_spec = [grpcclient.InferRequestedOutput("output0")]
-            res = client.infer(model, inp, outputs=out_spec)
-            out = res.as_numpy("output0")
-            t_inf_end = time.perf_counter()
-            lat.append((t_inf_end - ts) * 1000)
-            dec_times.append((t_dec_end - prev_t) * 1000 if prev_t else 0)
-            pre_times.append((t_pre_end - t_dec_end) * 1000)
-            prev_t = t_dec_end
-            dets_local = postprocess_np(out)
-            dets += dets_local
-            frames += 1
-        dt = time.perf_counter() - t0
-        la = np.array(lat)
-        dta = np.array(dec_times); pta = np.array(pre_times)
-        results[k] = {"frames": frames, "detections": dets, "fps": frames / dt,
-                        "lat_p50": float(np.percentile(la, 50)) if len(la) else 0,
-                        "lat_p95": float(np.percentile(la, 95)) if len(la) else 0,
-                        "decode_ms": float(dta.mean()) if len(dta) else 0,
-                        "preprocess_ms": float(pta.mean()) if len(pta) else 0}
+            dt = time.perf_counter() - t0
+            la = np.array(lat)
+            results[k] = {"frames": frames, "detections": dets, "fps": frames / dt,
+                          "lat_p50": float(np.percentile(la, 50)) if len(la) else 0,
+                          "lat_p95": float(np.percentile(la, 95)) if len(la) else 0,
+                          "decode_ms": 0.0, "preprocess_ms": 0.0}
+        else:
+            src_w, src_h = get_resolution(url)
+            dec_times, pre_times = [], []
+            prev_t = 0.0
+            for nv12 in decode_stream(url, src_w, src_h):
+                if time.perf_counter() - t0 > args.duration:
+                    break
+                t_dec_end = time.perf_counter()
+                tensor = letterbox_nv12_np(np.frombuffer(nv12, dtype=np.uint8), src_w, src_h)
+                t_pre_end = time.perf_counter()
+                ts = time.perf_counter()
+                inp = [grpcclient.InferInput("images", [1, 3, IMG, IMG], "FP32")]
+                inp[0].set_data_from_numpy(tensor)
+                out_spec = [grpcclient.InferRequestedOutput("output0")]
+                res = client.infer(model, inp, outputs=out_spec)
+                out = res.as_numpy("output0")
+                t_inf_end = time.perf_counter()
+                lat.append((t_inf_end - ts) * 1000)
+                dec_times.append((t_dec_end - prev_t) * 1000 if prev_t else 0)
+                pre_times.append((t_pre_end - t_dec_end) * 1000)
+                prev_t = t_dec_end
+                dets_local = postprocess_np(out)
+                dets += dets_local
+                frames += 1
+            dt = time.perf_counter() - t0
+            la = np.array(lat)
+            dta = np.array(dec_times); pta = np.array(pre_times)
+            results[k] = {"frames": frames, "detections": dets, "fps": frames / dt,
+                            "lat_p50": float(np.percentile(la, 50)) if len(la) else 0,
+                            "lat_p95": float(np.percentile(la, 95)) if len(la) else 0,
+                            "decode_ms": float(dta.mean()) if len(dta) else 0,
+                            "preprocess_ms": float(pta.mean()) if len(pta) else 0}
+
+    # Release shm regions. Without this the server keeps the registration while the
+    # segment is orphaned, and the NEXT run fails with "Invalid shared memory
+    # region" — which is what deadlocked the benchmark sweep.
+    for _nm, _h in ((f"pin_{run_tag}_{uid}", shm_in_h), (f"pout_{run_tag}_{uid}", shm_out_h)):
+        if _h is None:
+            continue
+        try:
+            if args.transfer == "cuda":
+                import tritonclient.utils.cuda_shared_memory as _csm
+                client.unregister_cuda_shared_memory(_nm)
+                _csm.destroy_shared_memory_region(_h)
+            else:
+                import tritonclient.utils.shared_memory as _shm
+                client.unregister_system_shared_memory(_nm)
+                _shm.destroy_shared_memory_region(_h)
+        except Exception:
+            pass
+
     q.put(results)
 
 
