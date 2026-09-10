@@ -83,9 +83,10 @@ B1 249/3.25, D 1615/36.6 ms wait, C2 996 fps).
 inside a DeepStream 7.1 container, and the resulting binary runs the pipeline
 (deserializes the TRT engine and loads the `nvinfer` config).
 
-**Not yet executed:** a full `docker build` of `Dockerfile.deepstream` from the
-`nvcr.io/nvidia/deepstream:7.1-triton-multiarch` base. The compile step it runs is
-verified; the base-image pull and apt layer are not.
+`Dockerfile.deepstream` has since been built end-to-end from the
+`nvcr.io/nvidia/deepstream:7.1-triton-multiarch` base as well: the image builds,
+`ds_bench` compiles into `/work/cpp/build/ds_bench`, and the binary links with no
+unresolved libraries. Both Dockerfiles are now verified rather than assumed.
 
 ## Notes / things to verify on your host
 

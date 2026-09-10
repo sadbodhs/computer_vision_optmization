@@ -81,7 +81,7 @@ generator imports it rather than re-implementing it, so the two cannot drift.
 RTX 3090 (compute 8.6, driver 595.84) · Triton 24.12 · TensorRT 10.7 (10.3 in the
 DeepStream container) · DeepStream 7.1 · Docker for everything.
 
-All numbers are medians across ≥3 runs unless noted; variance was <±2%.
+All numbers are medians across ≥3 runs unless noted; variance was <±2% — with one known exception, **A2 at concurrency 2, which is bimodal at ±12%** (see [`results/README.md`](../results/README.md)).
 
 ## Known caveats
 

@@ -59,20 +59,28 @@ stated run-to-run variance:
 | C2 | 464 (−1.0%) | 747 (+1.5%) | 1000 (+1.4%) | 1047 (+1.0%) | 1026 (−1.2%) |
 | D | 1047 (+0.6%) | 1129 (−0.6%) | 1276 (**−7.4%**) | 1617 (−1.4%) | 1672 (+0.4%) |
 
-**Two cells fall outside variance and are not being papered over:**
+**Two cells fell outside variance. Both have since been re-run 5 times, and they
+turned out to have different explanations:**
 
-- **A2 @ conc=2: 1084 vs 1219 published (−11%).** This matters because the
-  published claim is that A2 "hits its ~1200 fps plateau already at conc=2". In
-  this run the plateau starts at conc=4 (1168) instead. The plateau itself
-  reproduces; *where it begins* does not.
-- **D @ conc=4: 1276 vs 1378 (−7.4%).** D's batch-fill behaviour is the most
-  client-timing-sensitive arm in the study, so it is the most run-dependent.
+**A2 @ conc=2 — the cell is unstable, not wrong.** Five repeats:
+`1226 · 1213 · 1087 · 1101 · 1107` fps. It is *bimodal*: it either reaches ~1220
+or settles near ~1100, spread **138.6 fps (12.5%)**. Both the published 1219 and
+the 1084 re-run are inside its range, so neither is an error — but this cell does
+not honour the study's stated "<±2% variance", and it is the least reliable number
+in the capacity table. That matters because it is the cell behind the claim that
+**A2 saturates at concurrency 2**; on the low runs the plateau does not begin
+until concurrency 4.
 
-One re-run does not overturn a published median, and the tables have **not** been
-edited on the strength of it. Both cells need more repeats before either number
-is called wrong — noted here so the discrepancy is visible rather than buried.
+**D @ conc=4 — stable, and the published figure is ~3% high.** Five repeats:
+`1343 · 1337 · 1336 · 1335 · 1349` fps, spread **13.6 fps (1.0%)**. The reliable
+value is **~1337**, against 1378 published. Well within the kind of drift you get
+across separate sessions, and the shape of D's curve is unaffected.
 
-## Regenerating
+The published tables are left as they are — they are a real run, and re-running
+does not make an earlier honest measurement retroactively wrong. What changes is
+the confidence attached: treat A2 @ conc=2 as ±12%, and D @ conc=4 as ~1337.
+
+## Regenerating## Regenerating
 
 ```bash
 scripts/make_frames.sh videos/real.mp4 500   # capacity-replay input
