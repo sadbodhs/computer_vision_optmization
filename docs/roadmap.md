@@ -106,10 +106,15 @@ graphs turn out to be a *substitute* for multiple instances rather than an
 addition — +13.6% at `count: 1`, +3.1% at `count: 2`. `count: 4` + graphs fails
 graph capture and takes the server down.
 
-**Still untouched:** `preferred_batch_size`, `max_queue_delay_microseconds`, model
-warmup, response cache, rate limiter, priority levels, and NVIDIA's Model
-Analyzer. Flow D's dynamic-batch engines also need per-batch-size graph capture
-(`graph_spec`), untested.
+`preferred_batch_size` and `max_queue_delay_microseconds` swept too - see
+[batching](batching.md). `[4,8] / 5000us` is confirmed optimal, the knobs span 28%
+at concurrency 1 but only 2.7% at concurrency 8, and shortening the window makes
+latency *worse*, which corrected an earlier claim that 5ms was the floor of D's
+6.2ms latency.
+
+**Still untouched:** model warmup, response cache, rate limiter, priority levels,
+and NVIDIA's Model Analyzer. Flow D's dynamic-batch engines also need
+per-batch-size graph capture (`graph_spec`), untested.
 
 ### DeepStream E2 in capacity mode
 
