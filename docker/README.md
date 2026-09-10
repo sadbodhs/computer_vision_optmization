@@ -79,6 +79,14 @@ engines, `scripts/make_frames.sh` regenerates `frames.bin` inside the container,
 and every arm reproduces its published figure (A2 789 fps/1.25 ms, B2 638/1.30,
 B1 249/3.25, D 1615/36.6 ms wait, C2 996 fps).
 
+`docker/build_ds_bench.sh` is verified too: it compiles and links `ds_bench`
+inside a DeepStream 7.1 container, and the resulting binary runs the pipeline
+(deserializes the TRT engine and loads the `nvinfer` config).
+
+**Not yet executed:** a full `docker build` of `Dockerfile.deepstream` from the
+`nvcr.io/nvidia/deepstream:7.1-triton-multiarch` base. The compile step it runs is
+verified; the base-image pull and apt layer are not.
+
 ## Notes / things to verify on your host
 
 - The Triton C++ client SDK path is `/opt` (`-DTRITON_CLIENT_ROOT=/opt`), populated
