@@ -47,7 +47,7 @@ done
 
 # 2) 3-process pure TRT capacity (3 independent pipelines)
 for i in $(seq $REPEATS); do
-  OUT=$(docker_exec "bash /work/run_cpp3_cap.sh $DURATION" | tr '\n' ' ')
+  OUT=$(docker_exec "bash /work/scripts/run_cpp3_cap.sh $DURATION" | tr '\n' ' ')
   echo "A3proc_cap|$OUT" >> $OUTF
   echo "[A3proc_cap r$i] $OUT"
 done
@@ -60,7 +60,7 @@ run_arm "C2_rtsp3" "cd /work && python3 client_v2.py --models yolov8n,yolov8s,yo
 
 # 4) 3-process pure TRT RTSP (the original step-2 comparison)
 for i in $(seq $REPEATS); do
-  OUT=$(docker_exec "bash /work/run_cpp3.sh $DURATION" | tr '\n' ' ')
+  OUT=$(docker_exec "bash /work/scripts/run_cpp3.sh $DURATION" | tr '\n' ' ')
   echo "A3proc_rtsp|$OUT" >> $OUTF
   echo "[A3proc_rtsp r$i] $OUT"
 done
