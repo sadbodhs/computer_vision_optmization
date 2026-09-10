@@ -68,6 +68,24 @@ for sub in ("img",):
         shutil.copytree(src_dir, os.path.join(OUT, sub))
         print(f"copied docs/{sub}/")
 
+# On the site, swap the static Pareto PNG for the interactive Plotly version.
+# GitHub markdown cannot run JavaScript, so the committed .md keeps the PNG and
+# only the published site gets the interactive chart. Same data either way.
+PARETO_PNG = "![Latency versus throughput for every flow, swept over concurrency 1-16](img/pareto-latency-throughput.png)"
+PARETO_IFRAME = (
+    '<iframe src="img/pareto_interactive.html" title="Latency vs throughput"\n'
+    '        style="width:100%; height:540px; border:0;" loading="lazy"></iframe>\n'
+    '\n*Interactive: drag to zoom, click a legend entry to isolate a flow, hover a\n'
+    'point for its exact concurrency, throughput and latency. The static version of\n'
+    'this chart is in the repository.*'
+)
+results_md = os.path.join(OUT, "results.md")
+if os.path.exists(results_md):
+    _t = open(results_md, encoding="utf-8").read()
+    if PARETO_PNG in _t:
+        open(results_md, "w", encoding="utf-8").write(_t.replace(PARETO_PNG, PARETO_IFRAME))
+        print("swapped the Pareto PNG for the interactive chart")
+
 # README.md -> index.md
 readme = open(os.path.join(REPO, "README.md"), encoding="utf-8").read()
 open(os.path.join(OUT, "index.md"), "w", encoding="utf-8").write(link_re.sub(fix_readme_link, readme))
