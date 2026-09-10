@@ -8,8 +8,6 @@ Hardware: RTX 3090 · Triton 24.12 · TensorRT 10.7/10.3 · DeepStream 7.1 ·
 **YOLOv8s** FP16 @ 640×640 (identical ONNX, md5-verified across flows).
 Everything runs in Docker.
 
-## 10. Artifacts
-
 ---
 
 ## 1. The contenders (naming used everywhere in this repo)
@@ -166,7 +164,47 @@ hand-rolled C++ pipeline by ~50% on throughput**. The same server with naive
 clients (C1: 225 fps) loses 8×. Triton's framework is only as good as its
 client; its scheduler is the irreplaceable part.
 
-## 8. Decision guide
+## 8. Where does the time go? — stage decomposition (conc=1, YOLOv8s)
+
+Per-stage wall time for one frame, measured inside each flow with per-stage timers
+(`stages_ms` in every binary's JSON output):
+
+### Capacity mode (preprocessed frames, no decode — pure pipeline cost)
+
+| Stage | A2 (C++ TRT) | B2 (Triton, CUDA shm) | C2 (Python numpy) |
+|---|---|---|---|
+| Host→Device transfer | **0.25 ms** (H2D, pinned+async) | 0 (zero-copy shm) | 0 (sys-shm, server copies) |
+| Preprocess | 0 (already preprocessed input) | 0 | 0 |
+| Inference (GPU) + output handling | **0.98 ms** (incl. compact kernel) | 1.16 ms (gRPC round trip incl. server infer) | ~5.1 ms (gRPC + serialize) |
+| Postprocess (NMS, CPU) | 0.01 ms | 0.00 ms | ~1-3 ms (numpy NMS) |
+| **Total** | **1.25 ms** | **1.26 ms** | **~6.4 ms** |
+
+Reading: the engine itself is 0.97-0.98 ms everywhere. A2 adds 0.25 ms H2D + 0.01 NMS.
+B2's zero-copy shm makes the *entire* Triton framework cost 0.18 ms over A2.
+C2's gap is client-side: numpy serialization into gRPC (~3 ms) + Python NMS (~2 ms).
+
+### RTSP end-to-end mode (adds decode; includes source pacing)
+
+| Stage | A2 (C++ full-CUDA) | B2 (Triton, CUDA shm) | C2 (Python numpy) |
+|---|---|---|---|
+| Decode (NVDEC / pipe) | 0.15-0.4 ms compute (rest = waiting for 30fps frame) | same | ffmpeg pipe ≈ 33.3 ms wall (pacing) |
+| Preprocess | **0.15 ms** (fused CUDA kernel) | 0.15 ms | **1.26 ms** (numpy CPU) |
+| Infer + transfer | 1.22 ms | 1.71 ms (gRPC) | 5.08 ms (gRPC raw) |
+| Postprocess | 0.001 ms | 0.001 ms | ~1-3 ms |
+| **GPU-only total** | **≈1.4 ms** | **≈1.9 ms** | **≈7.5 ms** |
+
+Key facts:
+- **Decode is free at 30 FPS**: NVDEC decodes a frame in ~0.2-0.4 ms; the rest of the
+  33 ms frame interval the decoder *waits* for the next packet. In the C++ flows the
+  "decode" timer shows ~31.9 ms — that is socket-read blocking, not compute.
+- **Preprocess**: the fused CUDA kernel (0.15 ms) is 8× faster than numpy-on-CPU
+  (1.26 ms) — and numpy is already the *fast* Python option (torch was worse).
+- **The framework tax is only in the infer stage**: B2 pays 1.16-1.71 ms where A2
+  pays 0.98-1.22 — with CUDA shm, Triton's entire server costs ~0.2-0.5 ms per frame.
+- **CPU vs GPU split**: in A2, ~99% of pipeline time is GPU work; in C2, roughly
+  60% of client time is CPU (numpy serialize + NMS) — the GPU is idle waiting.
+
+## 9. Decision guide
 
 | Scenario | Pick | Latency (p50/frame) | Throughput | Why this pick |
 |---|---|---|---|---|
@@ -179,7 +217,7 @@ client; its scheduler is the irreplaceable part.
 
 ---
 
-## 9. Reproduce
+## 10. Reproduce
 
 ```bash
 docker restart triton-server        # image triton-bench:v3 (Triton arm)
@@ -198,7 +236,19 @@ docker exec ds-build bash -c 'cd /tmp && ./ds_bench --config /opt/ds/model/yolov
 Engines are gitignored — regenerate from the same ONNX (ultralytics export →
 `trtexec --fp16`) or pull the committed container images.
 
-## 10. Artifacts
+## 11. Appendix — model & preprocessing contract
+
+| Item | Value |
+|---|---|
+| **Model** | YOLOv8s (Ultralytics), COCO 80 classes |
+| **Input** | 640×640, RGB, /255 (sigmoid baked into export) |
+| **Precision** | FP16 engines from the same ONNX (md5-verified) |
+| **Engine format** | `.plan` (Triton) / `.engine` (DeepStream) — same serialization |
+| **Output** | `[1, 84, 8400]`, conf 0.25, class-aware NMS IoU 0.45 |
+| **Also tested** | YOLOv8n (1490 qps) · YOLO11n (1259 qps) |
+| **Preproc contract** | centered letterbox, pad 114, BGR→RGB, /255 — identical in every flow |
+
+## 12. Artifacts
 
 - `cpp/src/main_cuda.cu` — A2 · `cpp/src/main.cpp` — A1
 - `cpp/src/grpc_client_cuda.cu` — B2/D(sync) · `cpp/src/grpc_client.cpp` — B1

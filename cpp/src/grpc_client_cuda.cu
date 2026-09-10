@@ -72,6 +72,9 @@ __global__ void nv12_letterbox_kernel(
 
 struct GPUDet { float x1, y1, x2, y2, score; int cls; };
 
+struct B2Stages { double grpc = 0, post = 0, nms = 0; long n = 0; std::mutex mtx; };
+static B2Stages g_b2_stages;
+
 __global__ void compact_candidates_kernel(
     const float* __restrict__ out, int num_classes, int num_anchors, float conf_thr,
     GPUDet* __restrict__ dets, int* __restrict__ d_count, int max_dets) {
@@ -166,6 +169,7 @@ static void run_stream(StreamCtx* ctx) {
   auto do_infer_and_post = [&](long& fi_count) -> double {
     auto ts = std::chrono::steady_clock::now();
     CHECK_OK(client->Infer(&res, options, inputs, outputs));
+    auto t1 = std::chrono::steady_clock::now();
     // compact candidates on GPU reading the shm output region, then tiny D2H
     CUDA_CHECK(cudaMemsetAsync(d_count, 0, sizeof(int), stream));
     compact_candidates_kernel<<<(NUM_ANCHORS + 255) / 256, 256, 0, stream>>>(
@@ -174,12 +178,22 @@ static void run_stream(StreamCtx* ctx) {
     CUDA_CHECK(cudaStreamSynchronize(stream));
     int n = std::min(*h_count, MAX_DETS);
     CUDA_CHECK(cudaMemcpy(h_dets, d_dets, n * sizeof(GPUDet), cudaMemcpyDeviceToHost));
-    double lat = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
-    ctx->dets->fetch_add(nms_count(h_dets, n, 0.45f));
+    auto t2 = std::chrono::steady_clock::now();
+    double grpc_ms = std::chrono::duration<double, std::milli>(t1 - ts).count();
+    double post_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
+    double nms_ms = 0;
+    {
+      auto t3 = std::chrono::steady_clock::now();
+      int kept = nms_count(h_dets, n, 0.45f);
+      nms_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t3).count();
+      ctx->dets->fetch_add(kept);
+    }
+    { std::lock_guard<std::mutex> lk(g_b2_stages.mtx);
+      g_b2_stages.grpc += grpc_ms; g_b2_stages.post += post_ms; g_b2_stages.nms += nms_ms; g_b2_stages.n++; }
     ctx->frames->fetch_add(1);
     fi_count++;
     delete res; res = nullptr;
-    return lat;
+    return grpc_ms + post_ms + nms_ms;
   };
 
   if (ctx->mode == "file") {
@@ -301,10 +315,13 @@ int main(int argc, char** argv) {
     if (latencies.empty()) return 0;
     return latencies[std::min((size_t)(p * latencies.size()), latencies.size() - 1)];
   };
+  double sn = g_b2_stages.n ? g_b2_stages.n : 1;
   printf("{\"pipeline\":\"cpp_grpc_cuda_shm\",\"mode\":\"%s\",\"model\":\"%s\",\"streams\":%d,"
          "\"frames\":%ld,\"detections\":%ld,\"fps\":%.2f,"
-         "\"lat_ms_p50\":%.3f,\"lat_ms_p95\":%.3f,\"lat_ms_p99\":%.3f}\n",
+         "\"lat_ms_p50\":%.3f,\"lat_ms_p95\":%.3f,\"lat_ms_p99\":%.3f,"
+         "\"stages_ms\":{\"grpc_infer\":%.3f,\"post_compact\":%.3f,\"nms_cpu\":%.3f}}\n",
          mode.c_str(), model.c_str(), streams, n, dets.load(), n / duration,
-         pct(0.50), pct(0.95), pct(0.99));
+         pct(0.50), pct(0.95), pct(0.99),
+         g_b2_stages.grpc / sn, g_b2_stages.post / sn, g_b2_stages.nms / sn);
   return 0;
 }

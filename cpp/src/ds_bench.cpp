@@ -235,7 +235,12 @@ int main(int argc, char *argv[]) {
       continue;
     }
     char uri[128], name[32];
-    snprintf(uri, sizeof(uri), "rtsp://localhost:8554/cam%d", i + 1);
+    // file mode source override: local mp4 for N>3 streams (same video), else RTSP
+    if (g_file_mode && !g_file_path.empty() && g_file_path.find(".mp4") != std::string::npos) {
+      snprintf(uri, sizeof(uri), "file://%s", g_file_path.c_str());
+    } else {
+      snprintf(uri, sizeof(uri), "rtsp://localhost:8554/cam%d", i + 1);
+    }
     snprintf(name, sizeof(name), "src%d", i);
     // explicit proven chain: rtspsrc(TCP) -> rtph264depay -> h264parse -> nvv4l2decoder
     GstElement *src = gst_element_factory_make("rtspsrc", name);

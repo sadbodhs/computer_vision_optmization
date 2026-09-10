@@ -201,19 +201,35 @@ __global__ void compact_candidates_kernel(
 
 int main(int argc, char** argv) {
   std::string model = "yolov8s_dyn", file_path = "frames.bin";
+  std::string models_csv;
   int streams = 1;
   double duration = 10.0;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--model" && i + 1 < argc) model = argv[++i];
+    else if (a == "--models" && i + 1 < argc) models_csv = argv[++i];
     else if (a == "--file" && i + 1 < argc) file_path = argv[++i];
     else if (a == "--streams" && i + 1 < argc) streams = std::stoi(argv[++i]);
     else if (a == "--duration" && i + 1 < argc) duration = std::stod(argv[++i]);
   }
+  // distribute streams across models round-robin (Triton multi-model scenario)
+  std::vector<std::string> models;
+  if (!models_csv.empty()) {
+    size_t pos = 0;
+    while (true) {
+      size_t nxt = models_csv.find(',', pos);
+      models.push_back(models_csv.substr(pos, nxt == std::string::npos ? std::string::npos : nxt - pos));
+      if (nxt == std::string::npos) break;
+      pos = nxt + 1;
+    }
+  } else {
+    models.push_back(model);
+  }
+
   Stats stats;
   std::vector<std::thread> threads;
   for (int i = 0; i < streams; ++i)
-    threads.emplace_back(run_stream, i, model, file_path, duration, &stats);
+    threads.emplace_back(run_stream, i, models[i % models.size()], file_path, duration, &stats);
   for (auto& t : threads) t.join();
 
   long n = stats.frames.load();

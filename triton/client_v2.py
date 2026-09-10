@@ -173,27 +173,38 @@ def worker(rank, args, urls, models, q):
                 dets += postprocess_np(out)
                 frames += 1
                 fi = (fi + 1) % n
-        else:
-            src_w, src_h = get_resolution(url)
-            for nv12 in decode_stream(url, src_w, src_h):
-                if time.perf_counter() - t0 > args.duration:
-                    break
-                ts = time.perf_counter()
-                tensor = letterbox_nv12_np(np.frombuffer(nv12, dtype=np.uint8), src_w, src_h)
-                ts2 = time.perf_counter()
-                inp = [grpcclient.InferInput("images", [1, 3, IMG, IMG], "FP32")]
-                inp[0].set_data_from_numpy(tensor)
-                out_spec = [grpcclient.InferRequestedOutput("output0")]
-                res = client.infer(model, inp, outputs=out_spec)
-                out = res.as_numpy("output0")
-                lat.append((time.perf_counter() - ts2) * 1000)
-                dets += postprocess_np(out)
-                frames += 1
+    else:
+        src_w, src_h = get_resolution(url)
+        dec_times, pre_times = [], []
+        prev_t = 0.0
+        for nv12 in decode_stream(url, src_w, src_h):
+            if time.perf_counter() - t0 > args.duration:
+                break
+            t_dec_end = time.perf_counter()
+            tensor = letterbox_nv12_np(np.frombuffer(nv12, dtype=np.uint8), src_w, src_h)
+            t_pre_end = time.perf_counter()
+            ts = time.perf_counter()
+            inp = [grpcclient.InferInput("images", [1, 3, IMG, IMG], "FP32")]
+            inp[0].set_data_from_numpy(tensor)
+            out_spec = [grpcclient.InferRequestedOutput("output0")]
+            res = client.infer(model, inp, outputs=out_spec)
+            out = res.as_numpy("output0")
+            t_inf_end = time.perf_counter()
+            lat.append((t_inf_end - ts) * 1000)
+            dec_times.append((t_dec_end - prev_t) * 1000 if prev_t else 0)
+            pre_times.append((t_pre_end - t_dec_end) * 1000)
+            prev_t = t_dec_end
+            dets_local = postprocess_np(out)
+            dets += dets_local
+            frames += 1
         dt = time.perf_counter() - t0
         la = np.array(lat)
+        dta = np.array(dec_times); pta = np.array(pre_times)
         results[k] = {"frames": frames, "detections": dets, "fps": frames / dt,
                         "lat_p50": float(np.percentile(la, 50)) if len(la) else 0,
-                        "lat_p95": float(np.percentile(la, 95)) if len(la) else 0}
+                        "lat_p95": float(np.percentile(la, 95)) if len(la) else 0,
+                        "decode_ms": float(dta.mean()) if len(dta) else 0,
+                        "preprocess_ms": float(pta.mean()) if len(pta) else 0}
     q.put(results)
 
 
@@ -239,6 +250,11 @@ def main():
         "frames": n, "detections": d, "fps": n / args.duration,
         "per_stream_fps": [round(r["fps"], 1) for r in all_results],
         "lat_ms_p50": round(lat50, 2), "lat_ms_p95": round(lat95, 2),
+        "stages_ms": {
+            "decode_pipe": round(max(r.get("decode_ms", 0) for r in all_results), 2),
+            "preprocess_np": round(max(r.get("preprocess_ms", 0) for r in all_results), 2),
+            "infer_grpc": round(lat50, 2),
+        },
     }))
 
 

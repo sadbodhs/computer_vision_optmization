@@ -135,6 +135,19 @@ static ICudaEngine* loadEngine(const std::string& path) {
   return runtime->deserializeCudaEngine(data.data(), size);
 }
 
+struct StageTimes {  // milliseconds, per-thread accumulation
+  double h2d = 0, infer = 0, compact = 0, nms = 0;
+  double decode = 0, preprocess = 0;
+  long n = 0;
+  std::mutex mtx;
+  void add(const StageTimes& o) {
+    h2d += o.h2d; infer += o.infer; compact += o.compact; nms += o.nms;
+    decode += o.decode; preprocess += o.preprocess; n += o.n;
+  }
+};
+
+static StageTimes g_stages;
+
 struct StreamCtx {
   std::string url;
   ICudaEngine* engine;
@@ -190,7 +203,11 @@ static void runStream(StreamCtx* ctx) {
       double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
       if (el > ctx->duration) break;
       auto ts = std::chrono::steady_clock::now();
+      StageTimes st;
       CUDA_CHECK(cudaMemcpyAsync(d_in, buf.data() + fi * in_size, in_size, cudaMemcpyHostToDevice, stream));
+      CUDA_CHECK(cudaStreamSynchronize(stream));
+      st.h2d = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
+      auto t1 = std::chrono::steady_clock::now();
       exec->enqueueV3(stream);
       // GPU compact + copy only compacted dets (tiny) to host
       CUDA_CHECK(cudaMemsetAsync(d_count, 0, sizeof(int), stream));
@@ -198,11 +215,18 @@ static void runStream(StreamCtx* ctx) {
           d_out, NUM_CLASSES, NUM_ANCHORS, 0.25f, d_dets, d_count, MAX_DETS);
       CUDA_CHECK(cudaMemcpyAsync(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost, stream));
       CUDA_CHECK(cudaStreamSynchronize(stream));
+      st.infer = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+      auto t2 = std::chrono::steady_clock::now();
       int n = std::min(*h_count, MAX_DETS);
       CUDA_CHECK(cudaMemcpy(h_dets, d_dets, n * sizeof(GPUDet), cudaMemcpyDeviceToHost));
+      int kept = nms_count(h_dets, n, 0.45f);
+      st.compact = 0;  // compact ran on GPU inside t1 window
+      st.nms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t2).count();
+      st.n = 1;
       double lat = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
       { std::lock_guard<std::mutex> lk(*ctx->lat_mtx); ctx->latencies->push_back(lat); }
-      ctx->det_count->fetch_add(nms_count(h_dets, n, 0.45f));
+      { std::lock_guard<std::mutex> lk(g_stages.mtx); g_stages.add(st); }
+      ctx->det_count->fetch_add(kept);
       ctx->frame_count->fetch_add(1);
       fi = (fi + 1) % n_frames;
     }
@@ -248,11 +272,13 @@ static void runStream(StreamCtx* ctx) {
     while (true) {
       double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
       if (el > ctx->duration) break;
+      auto td = std::chrono::steady_clock::now();
       if (av_read_frame(fmt, pkt) < 0) { av_seek_frame(fmt, -1, 0, AVSEEK_FLAG_BACKWARD); continue; }
       if (pkt->stream_index != vs) { av_packet_unref(pkt); continue; }
       if (avcodec_send_packet(cctx, pkt) < 0) { av_packet_unref(pkt); continue; }
       av_packet_unref(pkt);
       if (avcodec_receive_frame(cctx, frame) < 0) continue;
+      double dec_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - td).count();
       if (frame->format != AV_PIX_FMT_CUDA) {
         // decoder gave us CPU frames (hwaccel not active) — skip
         av_frame_unref(frame); continue;
@@ -265,9 +291,14 @@ static void runStream(StreamCtx* ctx) {
       if (!src_y || !src_uv) { av_frame_unref(frame); continue; }
 
       auto ts = std::chrono::steady_clock::now();
+      StageTimes st;
       // fused preprocess writes straight into TRT input buffer
       nv12_letterbox_kernel<<<grd, blk, 0, stream>>>(
           src_y, src_uv, y_pitch, uv_pitch, src_w, src_h, d_in, nw, nh, pad_x, pad_y, IMG);
+      CUDA_CHECK(cudaStreamSynchronize(stream));
+      st.decode = dec_ms;
+      st.preprocess = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
+      auto t1 = std::chrono::steady_clock::now();
       exec->enqueueV3(stream);
       CUDA_CHECK(cudaMemsetAsync(d_count, 0, sizeof(int), stream));
       compact_candidates_kernel<<<(NUM_ANCHORS + 255) / 256, 256, 0, stream>>>(
@@ -276,15 +307,20 @@ static void runStream(StreamCtx* ctx) {
       CUDA_CHECK(cudaStreamSynchronize(stream));
       int n = std::min(*h_count, MAX_DETS);
       CUDA_CHECK(cudaMemcpy(h_dets, d_dets, n * sizeof(GPUDet), cudaMemcpyDeviceToHost));
+      st.infer = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+      auto t2 = std::chrono::steady_clock::now();
+      int kept = nms_count(h_dets, n, 0.45f);
+      st.nms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t2).count();
+      st.n = 1;
       double lat = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
       { std::lock_guard<std::mutex> lk(*ctx->lat_mtx); ctx->latencies->push_back(lat); }
-      ctx->det_count->fetch_add(nms_count(h_dets, n, 0.45f));
+      { std::lock_guard<std::mutex> lk(g_stages.mtx); g_stages.add(st); }
+      ctx->det_count->fetch_add(kept);
       ctx->frame_count->fetch_add(1);
       av_frame_unref(frame);
     }
     av_frame_free(&frame);
     av_packet_free(&pkt);
-    if (hw_frames) av_buffer_unref(&hw_frames);
     avcodec_free_context(&cctx);
     avformat_close_input(&fmt);
     if (hw_ctx) av_buffer_unref(&hw_ctx);
@@ -328,9 +364,15 @@ int main(int argc, char** argv) {
     if (latencies.empty()) return 0;
     return latencies[std::min((size_t)(p * latencies.size()), latencies.size() - 1)];
   };
+  double sn = g_stages.n ? g_stages.n : 1;
   std::cout << "{\"pipeline\":\"cpp_trt_cuda\",\"mode\":\"" << mode << "\",\"streams\":" << streams
             << ",\"frames\":" << n << ",\"detections\":" << dets.load() << ",\"fps\":" << (n / dt)
             << ",\"lat_ms_p50\":" << pct(0.50) << ",\"lat_ms_p95\":" << pct(0.95)
-            << ",\"lat_ms_p99\":" << pct(0.99) << "}" << std::endl;
+            << ",\"lat_ms_p99\":" << pct(0.99)
+            << ",\"stages_ms\":{\"decode\":" << g_stages.decode / sn
+            << ",\"preprocess\":" << g_stages.preprocess / sn
+            << ",\"h2d\":" << g_stages.h2d / sn
+            << ",\"infer_incl_compact\":" << g_stages.infer / sn
+            << ",\"nms_cpu\":" << g_stages.nms / sn << "}}" << std::endl;
   return 0;
 }
