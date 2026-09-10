@@ -41,9 +41,14 @@ Bound established in [precision](precision.md): **+33.6% (YOLOv8s), +19.4%
 less than the "2×" folklore, and on YOLOv8n it is *beaten* by CUDA graphs, which
 costs no accuracy.
 
-**Still blocked on accuracy.** A calibrated engine needs a real calibration set,
-and the number is only meaningful reported alongside an mAP delta. Until the
-accuracy axis exists there is no INT8 result here, only the ceiling.
+**Accuracy axis now exists** ([accuracy](accuracy.md)), and a calibrated engine
+has been built (`scripts/build_int8_engine.py`, MinMax over 250 COCO batches,
+14.6 MB vs FP16's 25.6 MB). It still cannot be *served*: TensorRT engines are
+locked to the exact build that produced them, ultralytics pip-installs its own
+TensorRT to export, and neither `tensorrt_cu13` 11.3 nor a pinned
+`tensorrt==10.7.0.post1` matches the container's native 10.7.0.23. The remaining
+work is to calibrate against the native library instead of a pip-installed one -
+an engineering step, not an open question. See [precision](precision.md).
 
 ### Structured sparsity (2:4) — ✅ measured, and closed
 

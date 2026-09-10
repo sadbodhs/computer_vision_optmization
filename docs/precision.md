@@ -59,10 +59,39 @@ The practical order of operations follows: **remove launch overhead first, then
 consider quantization.** Reaching for INT8 before graphs means paying an accuracy
 bill for throughput that was available for free.
 
-## Still not answered
+## Calibrated INT8: built, but blocked on a TensorRT version lock
 
-- **Calibrated INT8 + mAP.** The whole accuracy axis is missing; see
-  [roadmap](roadmap.md). Without it there is no INT8 *result*, only this bound.
+With the [accuracy harness](accuracy.md) in place the obvious next step was to
+score a *calibrated* engine and convert the ceiling above into a real trade.
+
+The engine builds correctly — [`scripts/build_int8_engine.py`](../scripts/build_int8_engine.py)
+runs MinMax calibration over 250 batches of COCO val images (the same
+preprocessing the flows use) and produces a **14.6 MB** engine versus FP16's
+25.6 MB, which is the expected shrink for genuine INT8 weights.
+
+**It cannot be served.** Triton rejects it:
+
+```
+IRuntime::deserializeCudaEngine: Error Code 1: Serialization
+(Serialization assertion plan->header.magicTag == rt::kPLAN_MAGIC_TAG failed.
+ Trying to load an engine created with incompatible serialization version.)
+```
+
+TensorRT engines are locked to the exact build that produced them. Ultralytics
+pip-installs its own TensorRT to export (`tensorrt_cu13` **11.3** by default), and
+the container serves with the **native 10.7.0.23**. Pinning the pip package to
+`tensorrt==10.7.0.post1` does not fix it either: `10.7.0.post1` and `10.7.0.23`
+are different builds of the same version, and the serialization check is exact.
+
+**The fix is to calibrate with the container's own TensorRT** rather than a
+pip-installed one — an `IInt8Calibrator` against the native library (C++, or
+Python bindings built from the same 10.7.0.23 build). That is the next piece of
+work, not a research question.
+
+So the INT8 row remains a **ceiling, not a result**: +33.6% throughput is what it
+could buy, and the mAP it costs is still unmeasured.
+
+## Still not answered
 - **Sparsity with retraining.** Not attempted, and finding 2 argues it is not
   worth attempting on this workload.
 - **INT8 through the pipelines.** These are `trtexec` engine measurements; no A2/B2/D
