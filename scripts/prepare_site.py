@@ -69,11 +69,14 @@ for sub in ("img",):
         print(f"copied docs/{sub}/")
 
 # On the site, swap the static Pareto PNG for the interactive Plotly version.
+# NOTE the ../ in the iframe src: MkDocs rewrites markdown links but NOT raw
+# HTML, and pages are served at <page>/index.html, so a bare img/... resolves
+# to /results/img/... and silently loads the 404 page inside the iframe.
 # GitHub markdown cannot run JavaScript, so the committed .md keeps the PNG and
 # only the published site gets the interactive chart. Same data either way.
 PARETO_PNG = "![Latency versus throughput for every flow, swept over concurrency 1-16](img/pareto-latency-throughput.png)"
 PARETO_IFRAME = (
-    '<iframe src="img/pareto_interactive.html" title="Latency vs throughput"\n'
+    '<iframe src="../img/pareto_interactive.html" title="Latency vs throughput"\n'
     '        style="width:100%; height:540px; border:0;" loading="lazy"></iframe>\n'
     '\n*Interactive: drag to zoom, click a legend entry to isolate a flow, hover a\n'
     'point for its exact concurrency, throughput and latency. The static version of\n'
