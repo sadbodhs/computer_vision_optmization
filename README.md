@@ -26,6 +26,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [DeepStream](docs/deepstream.md) | What does NVIDIA's own stack do? | 1.50 ms/frame, zero custom code, source-bound at 5.4% GPU |
 | [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
 | [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
+| [Precision](docs/precision.md) | What could INT8 / sparsity buy? | INT8 ceiling ~+34%; forced 2:4 sparsity ~+1% (speed only, no accuracy) |
 | [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8; MPS and CUDA graphs now measured |
 
 **Two reading paths.** Start-to-finish: STORY → Methodology → Results → the four
@@ -115,6 +116,7 @@ Details, per-arm commands, and the source→binary map: [Reproduce](docs/reprodu
 
 This study covers the **serving and transport layer**, at FP16, at 640×640, for
 detection on a single GPU. It has **no accuracy (mAP) axis**, and does not yet
-cover INT8, sparsity, in-graph NMS, input-resolution scaling, or application-level
-tricks like detect-and-track (MPS and CUDA graphs have since been measured). Those limits are enumerated
+cover in-graph NMS, input-resolution scaling, or application-level tricks like
+detect-and-track. MPS, CUDA graphs and the INT8/sparsity *speed ceilings* have
+since been measured; calibrated INT8 still needs the accuracy axis. Those limits are enumerated
 honestly in the [Roadmap](docs/roadmap.md).

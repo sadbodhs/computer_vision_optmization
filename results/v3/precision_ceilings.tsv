@@ -1,0 +1,9 @@
+model	variant	throughput_qps	latency_median_ms	note
+yolov8s	fp16	1020.68	1.27734	speed only
+yolov8s	fp16_sparse	1031.74	1.26709	speed ceiling - dense weights forced sparse, accuracy invalid
+yolov8s	int8_nocalib	1363.6	1.02979	speed only - NO calibration, accuracy invalid
+yolov8s	best_nocalib	1357.16	1.03467	speed only - NO calibration, accuracy invalid
+yolov8n	fp16	1476.54	0.975586	speed only
+yolov8n	fp16_sparse	1501.52	0.964111	speed ceiling - dense weights forced sparse, accuracy invalid
+yolov8n	int8_nocalib	1762.26	0.86792	speed only - NO calibration, accuracy invalid
+yolov8n	best_nocalib	1798.12	0.854858	speed only - NO calibration, accuracy invalid

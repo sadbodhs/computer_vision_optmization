@@ -26,23 +26,23 @@ moment precision changes: "1.9× faster" is meaningless without "and −x mAP."
 baseline. This is a prerequisite for everything in the rest of Tier 1, not an
 optional extra.
 
-### INT8 quantization
+### INT8 quantization — ⚠️ speed ceiling measured, result still blocked
 
-Everything here is FP16. INT8 is the largest remaining precision lever on Ampere
-and the most common real-world question. Supported: `trtexec --int8 --calib=`.
+Bound established in [precision](precision.md): **+33.6% (YOLOv8s), +19.4%
+(YOLOv8n)** for uncalibrated INT8 — the upper bound, not a result. Notably that is
+less than the "2×" folklore, and on YOLOv8n it is *beaten* by CUDA graphs, which
+costs no accuracy.
 
-*Method*: PTQ with an entropy calibrator over a few hundred representative frames;
-report throughput **and** mAP delta together. Expect the interesting result to be
-in the accuracy column, not the speed one.
+**Still blocked on accuracy.** A calibrated engine needs a real calibration set,
+and the number is only meaningful reported alongside an mAP delta. Until the
+accuracy axis exists there is no INT8 result here, only the ceiling.
 
-### Structured sparsity (2:4)
+### Structured sparsity (2:4) — ✅ measured, and closed
 
-Ampere (8.6) supports 2:4 structured sparsity; `trtexec --sparsity=` is available.
-
-*Method*: `--sparsity=force` on the existing weights gives the **speed ceiling**
-only — dense weights forced into a sparse kernel path lose accuracy. An honest
-result needs sparse-aware retraining. Worth measuring the ceiling first to see if
-the retraining is even worth it.
+Measured, and the answer is no: `--sparsity=force` yields **+1.1% (YOLOv8s) /
++1.7% (YOLOv8n)** — see [precision](precision.md). That is the *ceiling*, so the
+sparse-aware retraining needed to make it accuracy-neutral cannot pay for itself
+on this workload. Cheap negative result; question closed.
 
 > **Not applicable on this rig:** FP8. `trtexec` advertises `--fp8`, but compute
 > capability 8.6 has no FP8 tensor cores — that is Ada (8.9) and Hopper (9.0+).
