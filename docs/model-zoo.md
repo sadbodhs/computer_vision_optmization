@@ -109,7 +109,9 @@ Same task. Engine cost within 5% of each other. **27x the wire traffic.**
 The difference is one architectural choice: SegFormer emits logits at quarter
 resolution and leaves the upsample to the consumer; DeepLabV3 upsamples inside
 the graph and ships the full-resolution result. DeepLabV3 therefore spends **more
-time moving its answer than computing it** — 1.305 ms of D2H against 1.120 ms of
+time moving its answer than computing it** — and the only model in this sweep
+that does ([section 6](#6-the-output-binding-is-fp32-and-that-is-a-choice) halves that
+wire cost and collects 17.5% throughput for it) — 1.305 ms of D2H against 1.120 ms of
 compute.
 
 For any dense-prediction model, **where you put the upsample is a bigger
@@ -174,6 +176,73 @@ Parameter counts are in
 [`results/v3/model_zoo.tsv`](../results/v3/model_zoo.tsv) (`params`,
 `input_px`), counted from ONNX initializer dims — which works without loading
 the weights, and had to, because SAM ViT-H's are 2.4 GB of external blobs.
+
+## 6. The output binding is FP32, and that is a choice
+
+Every transport number above assumes an **FP32 output binding**, because that is
+what `trtexec` writes by default. It is not a property of the model. The engines
+are already 88-98% FP16 internally (checked with `--dumpLayerInfo`), so the
+FP32 output is a conversion on the way out, and binding the output as FP16
+halves the bytes.
+
+A/B, same ONNX, same `--fp16` build, only `--outputIOFormats` differs
+(`scripts/io_precision.py` -> [`results/v3/io_precision.tsv`](../results/v3/io_precision.tsv)):
+
+| Model | D2H FP32 | D2H FP16 | speedup | transport share | throughput |
+|---|---:|---:|---:|---:|---:|
+| ResNet50 | 0.0036 ms | 0.0033 ms | **1.08x** | 6.4% → 6.4% | +0.0% |
+| SegFormer-B0 | 0.0549 ms | 0.0291 ms | 1.88x | 13.6% → 11.8% | −1.0% |
+| YOLOv8s | 0.1107 ms | 0.0587 ms | 1.89x | 23.4% → 20.1% | −0.4% |
+| YOLO11n | 0.1128 ms | 0.0585 ms | 1.93x | 27.4% → 23.7% | +0.2% |
+| YOLO11n-seg | 0.2748 ms | 0.1400 ms | 1.96x | 33.2% → 26.2% | +0.5% |
+| U-Net-R34 | 1.1575 ms | 0.5821 ms | 1.99x | 42.6% → 30.0% | +1.1% |
+| **DeepLabV3-MNv3** | 1.3051 ms | 0.6445 ms | **2.03x** | 57.4% → 42.4% | **+17.5%** |
+
+The halving is real and lands almost exactly on 2x, approaching it as the tensor
+grows. ResNet50 is the control and shows **no gain at all**, which confirms the
+small-tensor floor from section 1: below ~1 MB a copy is latency-bound, so
+halving the bytes of a 3.9 KB tensor buys nothing.
+
+### But six of the seven gained no throughput
+
+Look at the last column. D2H halved everywhere, and **throughput moved on exactly
+one model.**
+
+The reason is the whole point. `trtexec` overlaps transfers with compute, so D2H
+only sets the frame rate when it is the *bottleneck* — and across these seven,
+it is the bottleneck exactly once:
+
+| | GPU compute | D2H (FP32) | binding |
+|---|---:|---:|---|
+| U-Net-R34 | 1.819 ms | 1.158 ms | GPU-bound |
+| **DeepLabV3-MNv3** | 1.120 ms | **1.305 ms** | **D2H-bound** |
+
+DeepLabV3 is the only model in this sweep that spends longer shipping its answer
+than computing it. Halve its D2H and the bottleneck moves back to the GPU:
+1.305 / 1.120 predicts **+16.5%**, and the measurement is **+17.5%**.
+
+U-Net has an output nearly as large and gained **+1.1%**, because at 1.819 ms of
+compute it was never waiting on the wire.
+
+> **Halving your output only speeds anything up if the output was the
+> bottleneck.** Otherwise it buys latency and PCIe headroom you may still want
+> for other reasons - a shared card, more streams - but not frames per second.
+
+That is this study's founding lesson in a third costume: an optimisation applied
+to a stage that was not the constraint produces a better number for that stage
+and no better product.
+
+### Two things this does not settle
+
+- **It was not the reformat.** The prediction going in was that an FP16 binding
+  would beat 2x by removing a cast on the way out, since the engines are already
+  mostly FP16. It does not - 2.03x is the ceiling observed. Whatever the FP32
+  output costs, it is the bytes and not the conversion.
+- **Accuracy is untested.** This changes the wire format, not the compute: the
+  values are what TensorRT already computed, at the precision it already used
+  internally, rounded on output. For a 98%-FP16 engine there should be little
+  left to lose - but that is reasoning, not a measurement, and no mAP was run on
+  an FP16-bound engine. Treat it as open.
 
 ## 6. The heavy end, and where the study expires
 
