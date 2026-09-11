@@ -26,6 +26,47 @@ raw data: [`results/v3/model_zoo.tsv`](../results/v3/model_zoo.tsv)
 
 ![Transport time tracks output size at 25 GB/s; transport share varies from 0.8% to 57%; model size predicts engine time in bulk](img/model-zoo.png)
 
+## Every model measured
+
+All 22, cheapest engine first. `Transport` is (H2D + D2H) as a share of frame
+time. Parameter counts come from the ONNX initializer dims; `Output` is the raw
+tensor the engine writes, before any postprocessing.
+
+<!-- BEGIN zoo-table -->
+
+| Model | Task | Params | Input | Output | Engine | Transport |
+|---|---|---:|---|---:|---:|---:|
+| **ResNet50** | cls | 25.5 M | 224x224 | 3.9 KB | 0.438 ms | 6.4% |
+| **EfficientNet-B0** | cls | 5.3 M | 224x224 | 3.9 KB | 0.542 ms | 5.2% |
+| **YOLO11n** | det | 2.7 M | 640x640 | 2.7 MB | 0.805 ms | 27.4% |
+| **YOLO11n-seg** | seg (inst) | 2.9 M | 640x640 | 6.8 MB | 0.935 ms | 33.2% |
+| **YOLOv8s** | det | 11.2 M | 640x640 | 2.7 MB | 0.987 ms | 23.3% |
+| **YOLO11s** | det | 9.5 M | 640x640 | 2.7 MB | 1.085 ms | 21.8% |
+| **DeepLabV3-MNv3** | seg | 11.0 M | 640x640 | 32.8 MB | 1.120 ms | 57.4% |
+| **YOLOv8s-World** | det (open-vocab) | 12.7 M | 640x640 | 2.7 MB | 1.148 ms | 20.8% |
+| **SegFormer-B0** | seg | 3.7 M | 512x512 | 1.2 MB | 1.176 ms | 13.5% |
+| **YOLO11s-seg** | seg (inst) | 10.1 M | 640x640 | 6.8 MB | 1.307 ms | 26.2% |
+| **EfficientNetV2-S** | cls | 21.4 M | 384x384 | 3.9 KB | 1.369 ms | 5.2% |
+| **U-Net-R34** | seg | 24.4 M | 640x640 | 29.7 MB | 1.818 ms | 42.6% |
+| **YOLO11m** | det | 20.1 M | 640x640 | 2.7 MB | 1.909 ms | 13.6% |
+| **YOLO11l** | det | 25.4 M | 640x640 | 2.7 MB | 2.545 ms | 10.6% |
+| **RT-DETR-L** | det | 32.8 M | 640x640 | 7.0 KB | 3.042 ms | 6.0% |
+| **SegFormer-B2** | seg | 27.4 M | 512x512 | 1.2 MB | 3.591 ms | 5.0% |
+| **YOLO11x** | det | 57.0 M | 640x640 | 2.7 MB | 3.948 ms | 7.1% |
+| **SegFormer-B5** | seg | 84.6 M | 512x512 | 1.2 MB | 8.018 ms | 2.3% |
+| **DINOv2-L** | backbone | 304.4 M | 518x518 | 5.4 MB | 13.655 ms | 2.5% |
+| **Depth Anything V2-L** | depth | 334.1 M | 518x518 | 1.0 MB | 17.273 ms | 1.0% |
+| **SAM ViT-B (encoder)** | promptable | 89.7 M | 1024x1024 | 4.0 MB | 18.748 ms | 3.4% |
+| **SAM ViT-H (encoder)** | promptable | 637.0 M | 1024x1024 | 4.0 MB | 82.644 ms | 0.8% |
+| *SSDLite-MNv3* | det | 3.4 M | — | — | *build failed* | — |
+| *Mask R-CNN R50* | seg (inst) | 44.5 M | — | — | *build failed* | — |
+
+<!-- END zoo-table -->
+
+*Generated from the raw data by [`gen_zoo_table.py`](../scripts/gen_zoo_table.py),
+so this table cannot drift from
+[`results/v3/model_zoo.tsv`](../results/v3/model_zoo.tsv).*
+
 ## 1. Transport cost is output bytes divided by PCIe bandwidth
 
 That is the entire law. Across 18 models with outputs over 500 KB — four tasks,
