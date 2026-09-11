@@ -36,6 +36,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [DeepStream](docs/deepstream.md) | What does NVIDIA's own stack do? | 1.50 ms/frame, zero custom code, source-bound at 5.4% GPU |
 | [Transport](docs/transport.md) | Which shared memory, and when? | CPU data → sys-shm (3.6×); GPU data → CUDA IPC (3×) |
 | [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
+| [Model cost](docs/model-scaling.md) | When does the plumbing stop mattering? | Non-engine cost is fixed at 0.256 ms; A2 crosses under 10% at a 2.3 ms engine, B1 not until 10.4 ms |
 | [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms queue wait |
 | [Triton tuning](docs/triton-tuning.md) | Were the Triton knobs right? | `count:2` validated (+30% over 1); graphs and instances are substitutes |
 | [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; +11.8% inside A2, and its plateau rises 1167→1249 fps |
@@ -133,7 +134,7 @@ Details, per-arm commands, and the source→binary map: [Reproduce](docs/reprodu
 ## Scope
 
 This study covers the **serving and transport layer**, at FP16, at 640×640, for
-detection on a single GPU. It now has an [accuracy axis](docs/accuracy.md), and does not yet
+detection on a single GPU, now swept across a [model-cost ladder](docs/model-scaling.md) rather than stated at one engine cost. It now has an [accuracy axis](docs/accuracy.md), and does not yet
 cover in-graph NMS, input-resolution scaling, or application-level tricks like
 detect-and-track. MPS, CUDA graphs and the INT8/sparsity *speed ceilings* have
 since been measured; calibrated INT8 still needs the accuracy axis. Those limits are enumerated

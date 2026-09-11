@@ -54,6 +54,7 @@ nav:
   - Where the time goes:
     - Transport: transport.md
     - Stage decomposition: stage-decomposition.md
+    - Model cost: model-scaling.md
   - Making it faster:
     - Batching: batching.md
     - Triton tuning: triton-tuning.md
