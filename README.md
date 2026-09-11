@@ -1,5 +1,8 @@
 # Triton vs Pure TensorRT vs DeepStream — Inference Pipeline Benchmark
 
+**📖 [Read this as a site](https://sadbodhs.github.io/computer_vision_optmization/)** — searchable, with an interactive version
+of the chart below.
+
 One question, answered with measurements: *for the same YOLO model on the same
 GPU, which serving pipeline processes a frame fastest, and which delivers the
 most frames per second?*

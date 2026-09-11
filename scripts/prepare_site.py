@@ -95,6 +95,14 @@ index_md = link_re.sub(fix_readme_link, readme)
 
 # Same PNG -> interactive swap on the index. Note the src has NO ../ here: index.md
 # is served at the site root, whereas results.md is served at results/index.html.
+# The README's "read this as a site" link is for repo visitors; on the site it
+# would point at the page you are already on, so drop it.
+SITE_LINK = ("**\U0001F4D6 [Read this as a site](%s)** \u2014 searchable, with an interactive version\n"
+             "of the chart below.\n\n" % "https://sadbodhs.github.io/computer_vision_optmization/")
+if SITE_LINK in index_md:
+    index_md = index_md.replace(SITE_LINK, "")
+    print("dropped the self-referential site link from the index")
+
 INDEX_PNG = "![Latency versus throughput for every flow](img/pareto-latency-throughput.png)"
 INDEX_IFRAME = (
     '<iframe src="img/pareto_interactive.html" title="Latency vs throughput"\n'
