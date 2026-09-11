@@ -11,7 +11,9 @@ Hardware: RTX 3090 · Triton 24.12 · TensorRT 10.7/10.3 · DeepStream 7.1 ·
 **YOLOv8s** FP16 @ 640×640 (identical ONNX, md5-verified across flows).
 Everything runs in Docker.
 
-**New here?** Read [STORY.md](STORY.md) — the narrative of how the first answer
+**New to this?** Start with [Introduction](docs/introduction.md) — what these
+stacks are, why the choice is hard, and why "fastest" is not a well-formed
+question. Then [STORY.md](STORY.md) for the narrative of how the first answer
 turned out to be wrong, and what it took to get a trustworthy one.
 
 ![Latency versus throughput for every flow](docs/img/pareto-latency-throughput.png)
@@ -25,6 +27,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 
 | Doc | Question it answers | Headline finding |
 |---|---|---|
+| [Introduction](docs/introduction.md) | Why does this choice even matter? | The plumbing costs more than the model; "fastest" depends on latency vs throughput |
 | [Methodology](docs/methodology.md) | How were these numbers produced? | A benchmark that saturates the source measures the source |
 | [Results](docs/results.md) | How fast is each pipeline? | A2 lowest latency (1.23 ms); D highest throughput (1665 fps) |
 | [Transport](docs/transport.md) | Which shared memory, and when? | CPU data → sys-shm (3.6×); GPU data → CUDA IPC (3×) |

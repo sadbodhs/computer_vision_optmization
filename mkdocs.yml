@@ -44,6 +44,7 @@ plugins:
 
 nav:
   - Overview: index.md
+  - Introduction: introduction.md
   - Methodology: methodology.md
   - Results: results.md
   - Transport: transport.md
