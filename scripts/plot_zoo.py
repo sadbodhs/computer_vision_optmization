@@ -46,7 +46,9 @@ for r in csv.DictReader(open(TSV), delimiter="\t"):
         continue
     rows.append(dict(m=r["model"], gpu=float(r["gpu_ms"]), h2d=float(r["h2d_ms"]),
                      d2h=float(r["d2h_ms"]), ob=int(r["out_bytes"]),
-                     pct=float(r["transport_pct"]), task=TASK.get(r["model"], "other")))
+                     pct=float(r["transport_pct"]), task=TASK.get(r["model"], "other"),
+                     par=int(r["params"]) if r.get("params") else 0,
+                     px=int(r["input_px"]) if r.get("input_px") else 0))
 
 print("%-22s %-15s %8s %8s %10s %8s %9s"
       % ("model", "task", "gpu_ms", "d2h_ms", "out_KB", "transp%", "GB/s"))
@@ -64,7 +66,23 @@ print("output size spans %.0fx; engine time spans %.0fx"
       % (max(r["ob"] for r in rows) / min(r["ob"] for r in rows),
          max(r["gpu"] for r in rows) / min(r["gpu"] for r in rows)))
 
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 4.8))
+# How well does model size predict engine time? Well enough in bulk to be worth
+# plotting, badly enough per-model to be worth warning about - see the doc.
+import math
+def _r2(xs, ys):
+    lx = [math.log(v) for v in xs]; ly = [math.log(v) for v in ys]
+    mx = sum(lx) / len(lx); my = sum(ly) / len(ly)
+    num = sum((a - mx) * (b - my) for a, b in zip(lx, ly))
+    den = math.sqrt(sum((a - mx) ** 2 for a in lx) * sum((b - my) ** 2 for b in ly))
+    return (num / den) ** 2
+
+sized = [r for r in rows if r["par"] and r["px"]]
+print("\nlog-log r2 vs engine time:  params %.3f | input px %.3f | params x px %.3f"
+      % (_r2([r["par"] for r in sized], [r["gpu"] for r in sized]),
+         _r2([r["px"] for r in sized], [r["gpu"] for r in sized]),
+         _r2([r["par"] * r["px"] for r in sized], [r["gpu"] for r in sized])))
+
+fig, (a1, a2, a3) = plt.subplots(1, 3, figsize=(17.5, 4.8))
 
 for task in COLOR:
     pts = [r for r in rows if r["task"] == task]
@@ -93,6 +111,26 @@ a2.set_title("Same task, same engine cost, opposite verdict\n"
              "DeepLabV3 57% vs SegFormer-B0 14%", fontsize=11)
 a2.tick_params(axis="y", labelsize=7.5)
 a2.grid(alpha=.25, axis="x")
+
+for task in COLOR:
+    pts = [r for r in sized if r["task"] == task]
+    if not pts:
+        continue
+    a3.scatter([r["par"] / 1e6 for r in pts], [r["gpu"] for r in pts],
+               s=46, color=COLOR[task], label=task, zorder=3)
+for nm, dx, dy in [("resnet50", 7, 5), ("yolo11l", -4, 8), ("segformer_b0", 6, 6),
+                   ("yolo11s", 5, -13), ("sam_vit_h_enc", -46, -14)]:
+    r = [z for z in sized if z["m"] == nm]
+    if r:
+        a3.annotate(nm, (r[0]["par"] / 1e6, r[0]["gpu"]), textcoords="offset points",
+                    xytext=(dx, dy), fontsize=8, color="#444")
+a3.set_xscale("log"); a3.set_yscale("log")
+a3.set_xlabel("parameters (millions, log)")
+a3.set_ylabel("engine time (ms, log)")
+a3.set_title("Model size predicts engine time in bulk\n"
+             "r\u00b2 %.2f - but resnet50 and yolo11l share 25M params"
+             % _r2([r["par"] for r in sized], [r["gpu"] for r in sized]), fontsize=11)
+a3.grid(alpha=.25, which="both"); a3.legend(fontsize=8)
 
 fig.tight_layout()
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

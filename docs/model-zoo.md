@@ -24,7 +24,7 @@ raw data: [`results/v3/model_zoo.tsv`](../results/v3/model_zoo.tsv)
 
 ---
 
-![Transport time tracks output size at 25 GB/s; transport share varies from 0.8% to 57%](img/model-zoo.png)
+![Transport time tracks output size at 25 GB/s; transport share varies from 0.8% to 57%; model size predicts engine time in bulk](img/model-zoo.png)
 
 ## 1. Transport cost is output bytes divided by PCIe bandwidth
 
@@ -86,7 +86,55 @@ This is [in-graph NMS](in-graph-nms.md) arriving as an architectural property
 instead of a post-hoc engine edit — and it is free here, because the model was
 designed that way rather than patched into it.
 
-## 5. The heavy end, and where the study expires
+## 5. Does model size predict any of this?
+
+Parameter counts are how people talk about model size, so it is worth asking what
+they actually buy you here. The answer is more favourable than the folklore:
+
+| Predictor | log-log r² against engine time |
+|---|---|
+| **parameters** | **0.800** |
+| input pixels | 0.284 |
+| **parameters × input pixels** | **0.901** |
+
+Parameters alone explain 80% of the variance in engine time across 22 models
+spanning four tasks and a 189x cost range. That is a good bulk predictor, and it
+is worth saying plainly because "parameter count tells you nothing about latency"
+is a common claim that this data does not support.
+
+**Per model, though, it will mislead you badly.** The residual hides errors of
+several times over:
+
+| | params | input px | engine |
+|---|---|---|---|
+| ResNet50 | 25.5 M | 50,176 | **0.438 ms** |
+| YOLO11l | 25.4 M | 409,600 | **2.545 ms** |
+
+Identical parameter counts, **5.8x the engine time.** Input resolution accounts
+for it — which is why the combined predictor reaches 0.901, and why quoting a
+parameter count without the input size is close to meaningless.
+
+And one pair defeats both variables:
+
+| | params | input px | engine |
+|---|---|---|---|
+| SegFormer-B0 | 3.7 M | 262,144 | **1.176 ms** |
+| YOLO11s | 9.5 M | 409,600 | **1.085 ms** |
+
+SegFormer-B0 has **2.6x fewer parameters and 1.6x fewer pixels, and is still
+slower.** Neither size nor resolution explains that; its attention blocks are
+memory-bandwidth-bound rather than compute-bound, and arithmetic intensity is not
+visible in either column. That residual is the honest ceiling on this kind of
+estimate.
+
+> **Use parameters to pick a shortlist. Never use them to predict a deadline.**
+
+Parameter counts are in
+[`results/v3/model_zoo.tsv`](../results/v3/model_zoo.tsv) (`params`,
+`input_px`), counted from ONNX initializer dims — which works without loading
+the weights, and had to, because SAM ViT-H's are 2.4 GB of external blobs.
+
+## 6. The heavy end, and where the study expires
 
 | Model | engine | transport share |
 |---|---|---|
