@@ -1,6 +1,6 @@
 # CUDA Graphs — how much of the "engine ceiling" is launch overhead?
 
-[← index](../README.md) · related: [Methodology](methodology.md) · [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [Triton tuning](triton-tuning.md) · next: [In-graph NMS](in-graph-nms.md)
 
 The study treats `trtexec` on the batch-1 engine — **0.97 ms / ~1028 qps** for
 YOLOv8s — as the physical floor, "the GPU's honest price." That framing is wrong
@@ -75,4 +75,4 @@ flow measured here launches per frame. It just is not a hardware floor.
 
 ---
 
-[← index](../README.md) · related: [Methodology](methodology.md) · [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [Triton tuning](triton-tuning.md) · next: [In-graph NMS](in-graph-nms.md)

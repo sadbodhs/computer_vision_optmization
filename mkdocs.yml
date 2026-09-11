@@ -43,20 +43,26 @@ plugins:
   - search
 
 nav:
-  - Overview: index.md
-  - Introduction: introduction.md
-  - Use cases: use-cases.md
-  - Methodology: methodology.md
-  - Results: results.md
-  - Transport: transport.md
-  - Batching: batching.md
-  - Contention: contention.md
-  - Stage decomposition: stage-decomposition.md
-  - DeepStream: deepstream.md
-  - CUDA graphs: cuda-graphs.md
-  - Triton tuning: triton-tuning.md
-  - In-graph NMS: in-graph-nms.md
-  - Accuracy: accuracy.md
-  - Precision: precision.md
-  - Reproduce: reproduce.md
-  - Roadmap: roadmap.md
+  - Start here:
+    - Introduction: index.md
+    - Overview: overview.md
+    - Use cases: use-cases.md
+  - The measurements:
+    - Methodology: methodology.md
+    - Results: results.md
+    - DeepStream: deepstream.md
+  - Where the time goes:
+    - Transport: transport.md
+    - Stage decomposition: stage-decomposition.md
+  - Making it faster:
+    - Batching: batching.md
+    - Triton tuning: triton-tuning.md
+    - CUDA graphs: cuda-graphs.md
+    - In-graph NMS: in-graph-nms.md
+    - Contention: contention.md
+  - What it costs:
+    - Accuracy: accuracy.md
+    - Precision: precision.md
+  - Practical:
+    - Reproduce: reproduce.md
+    - Roadmap: roadmap.md

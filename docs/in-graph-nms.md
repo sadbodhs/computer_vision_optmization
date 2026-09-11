@@ -1,6 +1,6 @@
 # In-graph NMS — paying 19% of the engine to save 1.15 ms of wire
 
-[← index](../README.md) · related: [Transport](transport.md) · [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [CUDA graphs](cuda-graphs.md) · next: [Contention](contention.md)
 
 Every flow in this study returns the raw detection head — `[1,84,8400]` FP32,
 **2.82 MB per frame** — and does NMS afterwards. Folding NMS into the engine
@@ -80,4 +80,4 @@ solve it properly gain nothing.
 
 ---
 
-[← index](../README.md) · related: [Transport](transport.md) · [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [CUDA graphs](cuda-graphs.md) · next: [Contention](contention.md)

@@ -1,6 +1,6 @@
 # Precision and sparsity — speed ceilings
 
-[← index](../README.md) · related: [CUDA graphs](cuda-graphs.md) · [Roadmap](roadmap.md)
+[← index](../README.md) · prev: [Accuracy](accuracy.md) · next: [Reproduce](reproduce.md)
 
 > ## ⚠️ These are throughput numbers only
 > **No accuracy was measured**, and the INT8 engines here were built **without a
@@ -127,4 +127,4 @@ The engine that comes out loads in Triton and is what the table above measures.
 
 ---
 
-[← index](../README.md) · related: [CUDA graphs](cuda-graphs.md) · [Roadmap](roadmap.md)
+[← index](../README.md) · prev: [Accuracy](accuracy.md) · next: [Reproduce](reproduce.md)

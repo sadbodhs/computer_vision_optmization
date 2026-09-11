@@ -96,4 +96,4 @@ All numbers are medians across ≥3 runs unless noted; variance was <±2% — wi
 
 ---
 
-[← index](../README.md) · next: [Results](results.md)
+[← index](../README.md) · prev: [Use cases](use-cases.md) · next: [Results](results.md)

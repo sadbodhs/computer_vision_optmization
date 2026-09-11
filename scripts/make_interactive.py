@@ -89,7 +89,11 @@ HTML = """<!doctype html>
 <title>Latency vs throughput</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <style>
-  html, body { margin: 0; padding: 0; background: transparent; }
+  /* The iframe is a separate document: without color-scheme it defaults to
+     light and the UA paints an opaque white canvas under `transparent`,
+     which shows as a white box on the site's dark theme. */
+  html, body { margin: 0; padding: 0; background: transparent;
+               color-scheme: light dark; }
   #chart { width: 100%%; height: 520px; }
 </style>
 <div id="chart"></div>

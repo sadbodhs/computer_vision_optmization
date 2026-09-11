@@ -1,6 +1,6 @@
 # Triton vs Pure TensorRT vs DeepStream — Inference Pipeline Benchmark
 
-**📖 [Read this as a site](https://sadbodhs.github.io/computer_vision_optmization/)** — searchable, with an interactive version
+**📖 [Read this as a site](https://sadbodhs.github.io/computer_vision_optmization/overview/)** — searchable, with an interactive version
 of the chart below.
 
 One question, answered with measurements: *for the same YOLO model on the same
@@ -33,21 +33,22 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Use cases](docs/use-cases.md) | Which of these is for *my* problem? | Four binding constraints; in three of them the lowest-latency pipeline is the wrong pick |
 | [Methodology](docs/methodology.md) | How were these numbers produced? | A benchmark that saturates the source measures the source |
 | [Results](docs/results.md) | How fast is each pipeline? | A2 lowest latency (1.23 ms); D highest throughput (1665 fps) |
-| [Transport](docs/transport.md) | Which shared memory, and when? | CPU data → sys-shm (3.6×); GPU data → CUDA IPC (3×) |
-| [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms queue wait |
-| [Contention](docs/contention.md) | What if N pipelines share the GPU? | MPS gives A2 +32% but B2 nothing — Triton's edge inverts once MPS is on |
-| [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
 | [DeepStream](docs/deepstream.md) | What does NVIDIA's own stack do? | 1.50 ms/frame, zero custom code, source-bound at 5.4% GPU |
-| [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
-| [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
+| [Transport](docs/transport.md) | Which shared memory, and when? | CPU data → sys-shm (3.6×); GPU data → CUDA IPC (3×) |
+| [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
+| [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms queue wait |
 | [Triton tuning](docs/triton-tuning.md) | Were the Triton knobs right? | `count:2` validated (+30% over 1); graphs and instances are substitutes |
-| [Accuracy](docs/accuracy.md) | Does the pipeline preserve the model? | Yes, for every model and both engine shapes; batching is accuracy-free; nearest-neighbour resize cost ~0.6 mAP (fixed) |
+| [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; graphs give +15–27% |
 | [In-graph NMS](docs/in-graph-nms.md) | Is the 2.82 MB output worth removing? | On raw gRPC yes — +33% despite a 19% slower engine; on zero-copy paths, no |
+| [Contention](docs/contention.md) | What if N pipelines share the GPU? | MPS gives A2 +32% but B2 nothing — Triton's edge inverts once MPS is on |
+| [Accuracy](docs/accuracy.md) | Does the pipeline preserve the model? | Yes, for every model and both engine shapes; batching is accuracy-free; nearest-neighbour resize cost ~0.6 mAP (fixed) |
 | [Precision](docs/precision.md) | Is INT8 worth it? | +32.8% throughput for −1.55 mAP — and it beats downgrading the model; sparsity ~+1%, not worth it |
+| [Reproduce](docs/reproduce.md) | How do I run this myself? | Four commands from a clean clone |
 | [Roadmap](docs/roadmap.md) | What is *not* covered? | No accuracy axis, no INT8; MPS and CUDA graphs now measured |
 
-**Two reading paths.** Start-to-finish: STORY → Methodology → Results → the four
-analysis docs. Or jump straight to the row above that matches your question.
+**Two reading paths.** Start-to-finish: the table above is in reading order —
+why it matters, then how it was measured, then what was measured, then what it
+costs. Or jump straight to the row that matches your question.
 
 Supporting material: [`results/`](results/README.md) (raw data + provenance) ·
 [`docker/`](docker/README.md) (container recipes).

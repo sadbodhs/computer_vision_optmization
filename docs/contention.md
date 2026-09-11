@@ -1,6 +1,6 @@
 # Contention — N pipelines, one GPU
 
-[← index](../README.md) · prev: [Batching](batching.md) · next: [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [In-graph NMS](in-graph-nms.md) · next: [Accuracy](accuracy.md)
 
 What happens to *your* latency when someone else is using the GPU too.
 
@@ -131,4 +131,4 @@ varied.**
 
 ---
 
-[← index](../README.md) · prev: [Batching](batching.md) · next: [Stage decomposition](stage-decomposition.md)
+[← index](../README.md) · prev: [In-graph NMS](in-graph-nms.md) · next: [Accuracy](accuracy.md)

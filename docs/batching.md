@@ -1,6 +1,6 @@
 # Batching — the trap, and Triton at its best
 
-[← index](../README.md) · prev: [Transport](transport.md) · next: [Contention](contention.md)
+[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Triton tuning](triton-tuning.md)
 
 Dynamic batching is where Triton either wins the whole study or loses to a
 200-line C++ program. Which one depends entirely on the client.
@@ -133,4 +133,4 @@ throughput at concurrency 1 (+5.9%) at a small latency cost.
 
 ---
 
-[← index](../README.md) · prev: [Transport](transport.md) · next: [Contention](contention.md)
+[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Triton tuning](triton-tuning.md)

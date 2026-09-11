@@ -1,9 +1,10 @@
 # Introduction — why this exists
 
-[← index](../README.md) · next: [Use cases](use-cases.md)
+next: [Overview](../README.md)
 
 If you already know why someone would agonise over Triton vs TensorRT vs
-DeepStream, skip to [Methodology](methodology.md). This page is for everyone else.
+DeepStream, you want the [Overview](../README.md) for the headline numbers or
+[Results](results.md) for the full tables. This page is for everyone else.
 
 ---
 
@@ -122,4 +123,4 @@ locks. Optimising the model is usually not where the frames are.
 
 ---
 
-[← index](../README.md) · next: [Use cases](use-cases.md)
+next: [Overview](../README.md)

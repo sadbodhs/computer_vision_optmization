@@ -1,6 +1,6 @@
 # Results — capacity and latency
 
-[← index](../README.md) · prev: [Methodology](methodology.md) · next: [Transport](transport.md)
+[← index](../README.md) · prev: [Methodology](methodology.md) · next: [DeepStream](deepstream.md)
 
 All flows run the **same YOLOv8s FP16 model**. Flow IDs are defined in the
 [contenders table](../README.md#the-contenders). Read
@@ -92,4 +92,4 @@ Raw data: [`results/`](../results/README.md) · full fair tables:
 
 ---
 
-[← index](../README.md) · prev: [Methodology](methodology.md) · next: [Transport](transport.md)
+[← index](../README.md) · prev: [Methodology](methodology.md) · next: [DeepStream](deepstream.md)

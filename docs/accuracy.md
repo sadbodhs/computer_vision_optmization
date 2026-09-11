@@ -1,6 +1,6 @@
 # Accuracy — does the pipeline preserve the model?
 
-[← index](../README.md) · related: [Methodology](methodology.md) · [Precision](precision.md)
+[← index](../README.md) · prev: [Contention](contention.md) · next: [Precision](precision.md)
 
 Every other page in this study measures speed. This one asks the question speed
 cannot: **does the custom preprocessing → TensorRT → custom NMS chain actually
@@ -175,4 +175,4 @@ speed-versus-accuracy trade.
 
 ---
 
-[← index](../README.md) · related: [Methodology](methodology.md) · [Precision](precision.md)
+[← index](../README.md) · prev: [Contention](contention.md) · next: [Precision](precision.md)

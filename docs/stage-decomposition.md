@@ -1,6 +1,6 @@
 # Where does the time go? — stage decomposition
 
-[← index](../README.md) · prev: [Contention](contention.md) · next: [DeepStream](deepstream.md)
+[← index](../README.md) · prev: [Transport](transport.md) · next: [Batching](batching.md)
 
 Per-stage wall time for one frame, measured inside each flow with per-stage timers
 (`stages_ms` in every binary's JSON output). Concurrency 1, YOLOv8s.
@@ -85,4 +85,4 @@ Folding NMS into the engine itself would remove this entirely — untested, see
 
 ---
 
-[← index](../README.md) · prev: [Contention](contention.md) · next: [DeepStream](deepstream.md)
+[← index](../README.md) · prev: [Transport](transport.md) · next: [Batching](batching.md)

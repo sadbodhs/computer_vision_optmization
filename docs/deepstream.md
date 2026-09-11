@@ -1,6 +1,6 @@
 # DeepStream (Flow E) — NVIDIA's integrated stack
 
-[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Reproduce](reproduce.md)
+[← index](../README.md) · prev: [Results](results.md) · next: [Transport](transport.md)
 
 The control arm: what do you get when you use NVIDIA's own end-to-end pipeline
 instead of assembling one?
@@ -114,4 +114,4 @@ scheduling) for an integrated pipeline that just works.
 
 ---
 
-[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Reproduce](reproduce.md)
+[← index](../README.md) · prev: [Results](results.md) · next: [Transport](transport.md)

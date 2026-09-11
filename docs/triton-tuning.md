@@ -1,6 +1,6 @@
 # Triton tuning — the knobs the study fixed without justifying
 
-[← index](../README.md) · related: [CUDA graphs](cuda-graphs.md) · [Batching](batching.md)
+[← index](../README.md) · prev: [Batching](batching.md) · next: [CUDA graphs](cuda-graphs.md)
 
 Two settings were hardcoded across every measurement in this study and never
 swept: `instance_group count` (always 2) and CUDA graphs (never enabled). This
@@ -91,4 +91,4 @@ hard-fail at `count: 4`.
 
 ---
 
-[← index](../README.md) · related: [CUDA graphs](cuda-graphs.md) · [Batching](batching.md)
+[← index](../README.md) · prev: [Batching](batching.md) · next: [CUDA graphs](cuda-graphs.md)
