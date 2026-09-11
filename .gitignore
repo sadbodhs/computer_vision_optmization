@@ -25,3 +25,10 @@ core
 site_src/
 _site/
 site/
+
+# Export scratch. torch writes ONNX external weights as EXTENSIONLESS files
+# (e.g. e.layers.0.attn.qkv.bias) once a model exceeds the 2 GB protobuf limit,
+# so the *.onnx rule above does not catch them - SAM ViT-H alone left 6.8 GB of
+# them here and they staged cleanly into a commit. Ignore the whole directory.
+triton/models/_exp/
+triton/models/*.tsv

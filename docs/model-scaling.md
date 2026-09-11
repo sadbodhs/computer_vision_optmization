@@ -1,6 +1,6 @@
 # Model cost — when does the plumbing stop mattering?
 
-[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Batching](batching.md)
+[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Across architectures](model-zoo.md)
 
 Every other number in this repo is YOLOv8s. That means every conclusion here is
 stated at **one engine cost**, and the study's headline claim — *the GPU is
@@ -94,4 +94,4 @@ try afterwards.**
 
 ---
 
-[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Batching](batching.md)
+[← index](../README.md) · prev: [Stage decomposition](stage-decomposition.md) · next: [Across architectures](model-zoo.md)

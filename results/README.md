@@ -18,6 +18,7 @@ What each file is, and how it maps to the tables in the top-level README/STORY.
 | `v3/accuracy.tsv` | v3 | COCO val2017 mAP (500 imgs): study chain vs ultralytics reference (`scripts/accuracy_eval.py`, `scripts/accuracy_reference.py`). |
 | `v3/deepstream_capacity.tsv` | v3 | E2 capacity-mode attempt. **Harness-bound, not a DeepStream ceiling** - GPU median 0% at 8 streams. Do not quote 501 fps as E2 capacity. |
 | `v3/model_scaling.tsv` | v3 | The model-cost ladder (YOLO11 n/s/m/l/x + yolov8s control) through A2, 3 interleaved repeats (`scripts/model_scaling.sh`). `non_engine_ms` is p50 minus engine time - the column the page is about. |
+| `v3/model_zoo.tsv` | v3 | 22 models across classification, detection, segmentation and dense backbones, engine-level (`scripts/engine_sweep.py`). H2D/GPU/D2H from `trtexec`; output shapes parsed from its build log. **Not comparable to the A2 columns in `model_scaling.tsv`.** |
 | `v3/in_graph_nms.tsv` | v3 | Output-size A/B: engine throughput and raw-gRPC round trip for the stock `[1,84,8400]` head vs an in-graph-NMS `[1,300,6]` build (`scripts/probe_transport.py`). |
 | `v3/batching_knobs.tsv` | v3 | `preferred_batch_size` x `max_queue_delay_microseconds` sweep on flow D at concurrency 1 and 8 (`scripts/batching_knobs.sh`). |
 | `v3/triton_knobs.tsv` | v3 | `instance_group count` x CUDA graphs sweep on B2 (`scripts/triton_knobs.sh`), 3 repeats per cell. |

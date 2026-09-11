@@ -144,7 +144,13 @@ the source really was the limit in the E1/E2 tables. See
 
 ## Tier 3 — completeness for a reference
 
-**Model-level** — input resolution (640 vs 416/512/960) is arguably the highest-leverage
+**Model-level** — model scaling is now measured: a cost ladder in
+[model cost](model-scaling.md) and 22 models across four tasks in
+[across architectures](model-zoo.md). Input resolution remains deliberately
+out of scope - a well-understood quadratic that would not change any
+conclusion here. Still absent: pruning and distillation.
+
+*(superseded)* input resolution (640 vs 416/512/960) is arguably the highest-leverage
 knob in CV inference and is entirely absent; cost scales ~quadratically. Also:
 model scaling beyond n/s, pruning, distillation.
 
