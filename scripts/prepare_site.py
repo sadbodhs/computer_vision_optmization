@@ -82,14 +82,20 @@ for sub in ("img",):
         print(f"copied docs/{sub}/")
 
 # On the site, swap the static Pareto PNG for the interactive Plotly version.
-# NOTE the ../ in the iframe src: MkDocs rewrites markdown links but NOT raw
-# HTML, and pages are served at <page>/index.html, so a bare img/... resolves
-# to /results/img/... and silently loads the 404 page inside the iframe.
+# Drawn INTO the page rather than into an iframe: an iframe is its own document
+# with its own canvas, so it rendered as a white box on the dark theme, and its
+# raw-HTML src is not rewritten by MkDocs so the relative depth had to be right
+# by hand -- which it once wasn't, silently loading the 404 page. See the header
+# of scripts/make_interactive.py.
 # GitHub markdown cannot run JavaScript, so the committed .md keeps the PNG and
-# only the published site gets the interactive chart. Same data either way.
-IFRAME = (
-    '<iframe src="../img/pareto_interactive.html" title="Latency vs throughput"\n'
-    '        style="width:100%; height:540px; border:0;" loading="lazy"></iframe>'
+# only the published site gets the chart. Same data either way.
+#
+# The ../ below is still hand-maintained: both pages that take the swap are
+# served at <page>/index.html, one level down. Assert it rather than trust it.
+CHART = (
+    '<div id="pareto-chart" style="width:100%; height:540px;"></div>\n'
+    '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>\n'
+    '<script src="../img/pareto_chart.js"></script>'
 )
 CAPTION = (
     '\n\n*Interactive: drag to zoom, click a legend entry to isolate a flow, hover a\n'
@@ -103,7 +109,7 @@ if os.path.exists(results_md):
     _t = open(results_md, encoding="utf-8").read()
     if PARETO_PNG in _t:
         open(results_md, "w", encoding="utf-8").write(
-            _t.replace(PARETO_PNG, IFRAME + CAPTION))
+            _t.replace(PARETO_PNG, CHART + CAPTION))
         print("swapped the Pareto PNG for the interactive chart")
     else:
         print("WARNING: results.md Pareto PNG not matched - it will stay static")
@@ -120,16 +126,18 @@ if SITE_LINK in overview_md:
     overview_md = overview_md.replace(SITE_LINK, "")
     print("dropped the self-referential site link from the overview")
 
-# Same swap on the overview. It is served at /overview/index.html, exactly like
-# results.md, so it takes the SAME ../ src -- when the README was the site root
-# it needed a bare img/ and that difference was a live bug once already.
+# Same swap on the overview: served at /overview/index.html, the same depth as
+# results.md, hence the same ../img/ src.
 INDEX_PNG = "![Latency versus throughput for every flow](img/pareto-latency-throughput.png)"
 if INDEX_PNG in overview_md:
-    overview_md = overview_md.replace(INDEX_PNG, IFRAME)
+    overview_md = overview_md.replace(INDEX_PNG, CHART)
     print("swapped the overview hero PNG for the interactive chart")
 else:
     print("WARNING: overview hero PNG not matched - it will stay static")
 
 open(os.path.join(OUT, README_PAGE), "w", encoding="utf-8").write(overview_md)
+
+for _p in ("results.md", README_PAGE):
+    assert _p != "index.md", "the chart src assumes depth 1, not the site root"
 
 print(f"staged {n} docs (introduction -> index.md) + {README_PAGE} into {OUT}")
