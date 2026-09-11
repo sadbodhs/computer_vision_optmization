@@ -1,6 +1,6 @@
 # Introduction — why this exists
 
-[← index](../README.md) · next: [Methodology](methodology.md)
+[← index](../README.md) · next: [Use cases](use-cases.md)
 
 If you already know why someone would agonise over Triton vs TensorRT vs
 DeepStream, skip to [Methodology](methodology.md). This page is for everyone else.
@@ -122,4 +122,4 @@ locks. Optimising the model is usually not where the frames are.
 
 ---
 
-[← index](../README.md) · next: [Methodology](methodology.md)
+[← index](../README.md) · next: [Use cases](use-cases.md)

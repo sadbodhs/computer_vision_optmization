@@ -45,6 +45,7 @@ plugins:
 nav:
   - Overview: index.md
   - Introduction: introduction.md
+  - Use cases: use-cases.md
   - Methodology: methodology.md
   - Results: results.md
   - Transport: transport.md

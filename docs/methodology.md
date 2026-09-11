@@ -1,6 +1,6 @@
 # Methodology — how these numbers were produced
 
-[← index](../README.md) · next: [Results](results.md)
+[← index](../README.md) · prev: [Use cases](use-cases.md) · next: [Results](results.md)
 
 Everything else in this repo depends on this page being right. The first pass of
 this study was wrong precisely because these rules were not in place — see
