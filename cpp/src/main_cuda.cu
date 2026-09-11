@@ -175,7 +175,13 @@ struct StreamCtx {
   std::string file_path;
   std::vector<double>* latencies;
   std::mutex* lat_mtx;
+  bool use_graph = false;
 };
+
+// Reported in the JSON so a run can never be mislabelled: capture is allowed to
+// fail at runtime (TensorRT does not guarantee every engine is capturable), and
+// this records what actually executed, not what was asked for.
+static std::atomic<bool> g_graph_active{false};
 
 static void runStream(StreamCtx* ctx) {
   const int IMG = 640, NUM_CLASSES = 80, NUM_ANCHORS = 8400;
@@ -213,6 +219,10 @@ static void runStream(StreamCtx* ctx) {
     std::vector<char> buf(sz);
     f.read(buf.data(), sz);
     long fi = 0;
+    bool use_graph = ctx->use_graph;
+    bool graph_ready = false;
+    cudaGraph_t graph = nullptr;
+    cudaGraphExec_t graph_exec = nullptr;
     auto t0 = std::chrono::steady_clock::now();
     while (true) {
       double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -223,13 +233,55 @@ static void runStream(StreamCtx* ctx) {
       CUDA_CHECK(cudaStreamSynchronize(stream));
       st.h2d = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - ts).count();
       auto t1 = std::chrono::steady_clock::now();
-      exec->enqueueV3(stream);
-      // GPU compact + copy only compacted dets (tiny) to host
-      CUDA_CHECK(cudaMemsetAsync(d_count, 0, sizeof(int), stream));
-      compact_candidates_kernel<<<(NUM_ANCHORS + 255) / 256, 256, 0, stream>>>(
-          d_out, NUM_CLASSES, NUM_ANCHORS, 0.25f, d_dets, d_count, MAX_DETS);
-      CUDA_CHECK(cudaMemcpyAsync(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost, stream));
-      CUDA_CHECK(cudaStreamSynchronize(stream));
+      // The captured region is exactly the st.infer window, so the graph's
+      // effect lands in a stage the report already breaks out. The input H2D
+      // stays outside it: a graph freezes every argument at capture time and
+      // that copy's source pointer walks through the frame buffer.
+      if (use_graph) {
+        if (!graph_ready) {
+          // TensorRT does lazy per-context setup on the first enqueue; doing it
+          // inside the capture would record that one-off work into every replay.
+          exec->enqueueV3(stream);
+          CUDA_CHECK(cudaStreamSynchronize(stream));
+          cudaError_t cap = cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal);
+          if (cap == cudaSuccess) {
+            exec->enqueueV3(stream);
+            cudaMemsetAsync(d_count, 0, sizeof(int), stream);
+            compact_candidates_kernel<<<(NUM_ANCHORS + 255) / 256, 256, 0, stream>>>(
+                d_out, NUM_CLASSES, NUM_ANCHORS, 0.25f, d_dets, d_count, MAX_DETS);
+            cudaMemcpyAsync(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost, stream);
+            cap = cudaStreamEndCapture(stream, &graph);
+          }
+          if (cap == cudaSuccess) {
+            cap = cudaGraphInstantiateWithFlags(&graph_exec, graph, 0);
+          }
+          if (cap == cudaSuccess) {
+            graph_ready = true;
+            g_graph_active.store(true);
+          } else {
+            // Not fatal, and not silently ignored either: fall back to the
+            // normal path and say so, so a fallback run is never read as a
+            // graph run.
+            std::cerr << "cuda graph capture failed: " << cudaGetErrorString(cap)
+                      << " - falling back to plain launches" << std::endl;
+            cudaGetLastError();
+            use_graph = false;
+          }
+        }
+        if (graph_ready) {
+          CUDA_CHECK(cudaGraphLaunch(graph_exec, stream));
+          CUDA_CHECK(cudaStreamSynchronize(stream));
+        }
+      }
+      if (!use_graph) {
+        exec->enqueueV3(stream);
+        // GPU compact + copy only compacted dets (tiny) to host
+        CUDA_CHECK(cudaMemsetAsync(d_count, 0, sizeof(int), stream));
+        compact_candidates_kernel<<<(NUM_ANCHORS + 255) / 256, 256, 0, stream>>>(
+            d_out, NUM_CLASSES, NUM_ANCHORS, 0.25f, d_dets, d_count, MAX_DETS);
+        CUDA_CHECK(cudaMemcpyAsync(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost, stream));
+        CUDA_CHECK(cudaStreamSynchronize(stream));
+      }
       st.infer = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
       auto t2 = std::chrono::steady_clock::now();
       int n = std::min(*h_count, MAX_DETS);
@@ -245,6 +297,8 @@ static void runStream(StreamCtx* ctx) {
       ctx->frame_count->fetch_add(1);
       fi = (fi + 1) % n_frames;
     }
+    if (graph_exec) cudaGraphExecDestroy(graph_exec);
+    if (graph) cudaGraphDestroy(graph);
   } else {
     // ---- RTSP with NVDEC zero-copy (frames stay on GPU) ----
     // 1) hw device ctx for decoder
@@ -351,6 +405,7 @@ int main(int argc, char** argv) {
   std::string mode = "rtsp", file_path = "frames.bin";
   int streams = 1;
   double duration = 30.0;
+  bool use_graph = false;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--engine" && i + 1 < argc) engine_path = argv[++i];
@@ -359,6 +414,7 @@ int main(int argc, char** argv) {
     else if (a == "--duration" && i + 1 < argc) duration = std::stod(argv[++i]);
     else if (a == "--mode" && i + 1 < argc) mode = argv[++i];
     else if (a == "--file" && i + 1 < argc) file_path = argv[++i];
+    else if (a == "--cuda-graph") use_graph = true;
   }
   ICudaEngine* engine = loadEngine(engine_path);
   if (!engine) return 1;
@@ -368,7 +424,7 @@ int main(int argc, char** argv) {
   std::vector<std::thread> threads;
   std::vector<StreamCtx> ctxs(streams);
   for (int i = 0; i < streams; ++i) {
-    ctxs[i] = {url, engine, i, &frames, &dets, &running, duration, mode, file_path, &latencies, &lat_mtx};
+    ctxs[i] = {url, engine, i, &frames, &dets, &running, duration, mode, file_path, &latencies, &lat_mtx, use_graph};
     threads.emplace_back(runStream, &ctxs[i]);
   }
   for (auto& t : threads) t.join();
@@ -384,6 +440,7 @@ int main(int argc, char** argv) {
             << ",\"frames\":" << n << ",\"detections\":" << dets.load() << ",\"fps\":" << (n / dt)
             << ",\"lat_ms_p50\":" << pct(0.50) << ",\"lat_ms_p95\":" << pct(0.95)
             << ",\"lat_ms_p99\":" << pct(0.99)
+            << ",\"cuda_graph\":" << (g_graph_active.load() ? "true" : "false")
             << ",\"stages_ms\":{\"decode\":" << g_stages.decode / sn
             << ",\"preprocess\":" << g_stages.preprocess / sn
             << ",\"h2d\":" << g_stages.h2d / sn

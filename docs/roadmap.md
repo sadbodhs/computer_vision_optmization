@@ -60,19 +60,23 @@ on this workload. Cheap negative result; question closed.
 
 ## Tier 2 — levers that would move numbers already published
 
-### CUDA Graphs — ✅ measured at engine level
+### CUDA Graphs — measured at engine level and inside A2
 
-Done: [CUDA graphs](cuda-graphs.md). `--useCudaGraph` gives **+23.2% (YOLOv8n),
-+14.9% (YOLOv8s), +27.0% (YOLO11n)** — a roughly constant **~0.13 ms** of
-per-iteration launch overhead removed, which is why the percentage is larger for
-cheaper models. The published 0.97 ms ceiling is therefore launch-bound, not a
-hardware floor.
+Done: [CUDA graphs](cuda-graphs.md). `trtexec --useCudaGraph` gives +14.9%
+(YOLOv8s), and the saving is a roughly constant ~0.13 ms of launch overhead
+rather than a percentage.
 
-**Still open:** no pipeline binary uses graphs. Capturing the infer + compact
-kernel into a graph inside `main_cuda.cu` is an unmade code change; ~0.13 ms is
-the projected headroom for A2, not a measurement. Triton's own
-`optimization { cuda { graphs: true } }` is also untested for B2/D, and
-fixed-shape capture complicates the dynamic-batch engines used by D.
+Now also measured **inside the A2 pipeline**, which was the open item: a
+`--cuda-graph` flag on `trt_pipeline_cuda` captures the inference region and
+replays it. Result **+11.8% fps at concurrency 1** (799 -> 894), p95 -10.6%, and
+the plateau rises from ~1167 to ~1249 fps. The absolute saving, 0.1315 ms, lands
+on the projection; the percentage is lower than the engine's because the fixed
+cost is divided by a bigger per-frame budget.
+
+Still open: **flow D**. Its dynamic-batch engines need one captured graph per
+batch size (`graph_spec`), which is why [Triton tuning](triton-tuning.md) could
+not cover it either. A1 is unmeasured but uninteresting - same fixed saving, a
+slightly larger budget.
 
 ### CUDA MPS - measured for both flows, question closed
 
