@@ -55,6 +55,23 @@ point of [flow D](batching.md).
 frame **waits 6.2 ms** for its batch to fill, then the GPU **services it in
 0.61 ms**. D's high fps is *bought with queue wait*.
 
+### Notation
+
+The arrow is used in two senses, and the difference matters:
+
+| Form | Means | Example |
+|---|---|---|
+| `a → b` **inside a stage or flow name** | *then*, or *into* | `decode→infer→parse`, `BGR→RGB`, `Host→Device` |
+| `a → b` **inside a measured cell** | *before → after*, baseline first | `1023 → 1359 fps` is the baseline, then the change being tested |
+
+Where a column is a before/after pair, its header names both sides
+(`transport share FP32 → FP16`), so a cell can always be read on its own.
+
+Other conventions: **p50/p95/p99** are percentiles of per-frame latency, never
+averages. **fps** is whole-pipeline throughput, not per stream. A **bold** row is
+the one the surrounding text is arguing about. *Italic* rows are controls or
+failures, not results.
+
 ## Preprocessing parity (the contract)
 
 > **Match preprocessing bit-for-bit before comparing pipelines.** In v1 the C++

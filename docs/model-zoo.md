@@ -186,7 +186,8 @@ FP32 output is a conversion on the way out, and binding the output as FP16
 halves the bytes.
 
 A/B, same ONNX, same `--fp16` build, only `--outputIOFormats` differs. Each
-arrow below reads **FP32 binding → FP16 binding**; `throughput change` is the
+arrow below reads **FP32 binding → FP16 binding**
+([notation](methodology.md#notation)); `throughput change` is the
 FP16 build measured against the FP32 one
 (`scripts/io_precision.py` -> [`results/v3/io_precision.tsv`](../results/v3/io_precision.tsv)):
 

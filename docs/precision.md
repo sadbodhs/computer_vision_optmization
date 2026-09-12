@@ -85,7 +85,7 @@ meaningful rather than garbage.
 The obvious alternative to quantising is downgrading the model. Both bought from
 the same FP16 YOLOv8s baseline:
 
-| Route | Throughput | mAP cost |
+| Route | Throughput<br>baseline → after | mAP cost |
 |---|---|---|
 | **INT8 on YOLOv8s** | 1023 → 1359 (**+32.8%**) | **−1.55 points** |
 | Switch to YOLO11n (FP16) | 1023 → 1253 (+22.5%) | −5.79 points |
