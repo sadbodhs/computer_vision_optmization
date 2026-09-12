@@ -185,10 +185,12 @@ are already 88-98% FP16 internally (checked with `--dumpLayerInfo`), so the
 FP32 output is a conversion on the way out, and binding the output as FP16
 halves the bytes.
 
-A/B, same ONNX, same `--fp16` build, only `--outputIOFormats` differs
+A/B, same ONNX, same `--fp16` build, only `--outputIOFormats` differs. Each
+arrow below reads **FP32 binding → FP16 binding**; `throughput change` is the
+FP16 build measured against the FP32 one
 (`scripts/io_precision.py` -> [`results/v3/io_precision.tsv`](../results/v3/io_precision.tsv)):
 
-| Model | D2H FP32 | D2H FP16 | speedup | transport share | throughput |
+| Model | D2H FP32 | D2H FP16 | speedup | transport share<br>FP32 → FP16 | throughput<br>change |
 |---|---:|---:|---:|---:|---:|
 | ResNet50 | 0.0036 ms | 0.0033 ms | **1.08x** | 6.4% → 6.4% | +0.0% |
 | SegFormer-B0 | 0.0549 ms | 0.0291 ms | 1.88x | 13.6% → 11.8% | −1.0% |
