@@ -19,6 +19,22 @@ costs if you feed them naively.
 
 ## Capacity results
 
+**Reading the cells.** `↑` is throughput (higher better), `↓` is per-frame
+latency p50 (lower better). Flow D splits its latency in two because the two
+halves behave differently: **`wait`** is how long a frame sits in the server
+queue waiting for batch-mates, and **`svc`** is the GPU service time once the
+batch runs. Full conventions: [notation](methodology.md#notation).
+
+!!! warning "`svc 0.61` is a ceiling, not a measurement"
+
+    The same `0.61` appears on every D row because it is the **`trtexec`
+    batch-8 per-frame cost** — the engine's floor — not a per-concurrency
+    measurement of the server. Triton's own counters show D does not reach
+    batch 8 until concurrency 8: it forms batches of **exactly 4.00** at
+    concurrency 1-4, so the real service cost there is higher than 0.61.
+    Measured in [batching](batching.md#what-batch-size-does-d-actually-form).
+
+
 Two numbers per cell. **`fps↑` = throughput (higher is better) · `ms↓` = per-frame
 latency p50 (lower is better)**. Best value per row is **bold**.
 

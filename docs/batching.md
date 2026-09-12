@@ -7,6 +7,57 @@ Dynamic batching is where Triton either wins the whole study or loses to a
 
 ---
 
+## What batch size does D actually form?
+
+The study calls flow D "batch-8" throughout, because `yolov8s_dyn` is built on a
+batch-8 engine with `max_batch_size: 8`. That is what the server is *allowed* to
+do. Triton's own counters say what it *did*:
+
+| Concurrency | fps | executions | **mean batch formed** |
+|---|---:|---:|---:|
+| 1 | 1023.0 | 2558 | **4.00** |
+| 2 | 1126.8 | 2818 | **4.00** |
+| 4 | 1340.4 | 3354 | **4.00** |
+| 8 | 1619.6 | 2033 | 7.97 |
+| 16 | 1580.9 | 2367 | 6.68 |
+
+Mean batch is `nv_inference_count / nv_inference_exec_count` scraped from
+Triton's metrics endpoint either side of each run
+([`batch_achieved.sh`](../scripts/batch_achieved.sh) ->
+[`results/v3/batch_achieved.tsv`](../results/v3/batch_achieved.tsv)).
+
+**At concurrency 1-4 the batch is 4, not 8** - and exactly 4.00, not an average
+that happens to land near it. That is `preferred_batch_size: [4, 8]` doing its
+job: Triton takes the smaller preferred size rather than hold the queue open
+waiting for eight. Only at concurrency 8 does it fill (7.97), and at 16 it falls
+back to 6.68 as the queue outruns the window.
+
+So "D is batch-8" is true of the configuration and true of the measurement only
+at concurrency >= 8. Below that, D's per-frame GPU cost is the batch-4 cost,
+which is higher than the 0.61 ms batch-8 figure quoted in
+[results](results.md#capacity-results).
+
+### Why the duration counters cannot be read as per-frame service
+
+Tempting, and wrong: Triton credits **every request in a batch with the whole
+batch's execution time**, so `compute_infer_duration_us / requests` returns the
+batch execution time, not the per-frame cost. At concurrency 1 that is 3.08 ms -
+for a batch of four, i.e. ~0.77 ms/frame, against the batch-8 engine's 0.61 ms.
+The raw TSV keeps the columns so the arithmetic is checkable, but they are
+labelled per-frame only in the sense Triton means it, which is not the sense a
+reader expects.
+
+### One measurement that was not reproducible
+
+The first pass recorded **554.7 fps at concurrency 16**, which would have been a
+dramatic collapse. It was an artefact: the concurrency-8 arm leaves a deep queue
+(16.3 ms/frame of accumulated wait), and the next arm started before it drained.
+Three clean re-runs put concurrency 16 at 1649.7 / 1561.1 / 1641.0 fps. The
+script now sleeps between arms. Recorded because a benchmark that does not let
+the previous arm finish is exactly the class of error this study exists to
+document.
+
+
 ## The trap
 
 The batch-8 engine costs 4.84 ms for eight frames — 0.61 ms each, **37% cheaper
