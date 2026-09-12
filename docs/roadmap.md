@@ -150,10 +150,6 @@ the source really was the limit in the E1/E2 tables. See
 out of scope - a well-understood quadratic that would not change any
 conclusion here. Still absent: pruning and distillation.
 
-*(superseded)* input resolution (640 vs 416/512/960) is arguably the highest-leverage
-knob in CV inference and is entirely absent; cost scales ~quadratically. Also:
-model scaling beyond n/s, pruning, distillation.
-
 **Application-level** — the biggest real-world wins, all unmeasured: detect every
 N frames + track between, ROI/tiling for small objects, adaptive frame skipping,
 cascades (cheap detector → expensive classifier). These routinely beat every

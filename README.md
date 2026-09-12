@@ -134,9 +134,14 @@ Details, per-arm commands, and the source→binary map: [Reproduce](docs/reprodu
 
 ## Scope
 
-This study covers the **serving and transport layer**, at FP16, at 640×640, for
-detection on a single GPU, now swept across a [model-cost ladder](docs/model-scaling.md) rather than stated at one engine cost. It now has an [accuracy axis](docs/accuracy.md), and does not yet
-cover in-graph NMS, input-resolution scaling, or application-level tricks like
-detect-and-track. MPS, CUDA graphs and the INT8/sparsity *speed ceilings* have
-since been measured; calibrated INT8 still needs the accuracy axis. Those limits are enumerated
-honestly in the [Roadmap](docs/roadmap.md).
+This study covers the **serving and transport layer**, at FP16, for detection on a
+single GPU — no longer at a single engine cost, since it now sweeps a
+[model-cost ladder](docs/model-scaling.md) and
+[22 models across four tasks](docs/model-zoo.md). It has an
+[accuracy axis](docs/accuracy.md), including calibrated INT8. MPS, CUDA graphs,
+[in-graph NMS](docs/in-graph-nms.md) and the INT8/sparsity ceilings are measured.
+
+**Still not covered:** input resolution (deliberately — a well-understood
+quadratic), application-level tricks like detect-and-track, multi-GPU, and an
+accuracy axis for segmentation. Those limits are enumerated honestly in the
+[Roadmap](docs/roadmap.md).
