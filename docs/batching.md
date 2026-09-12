@@ -7,6 +7,66 @@ Dynamic batching is where Triton either wins the whole study or loses to a
 
 ---
 
+## Where D's latency actually goes
+
+[Results](results.md#capacity-results) labels D's latency `wait`, which reads as
+time spent in Triton's batching queue. The client measures
+`callback - send_ts` ([`grpc_async_client.cu:169`](../cpp/src/grpc_async_client.cu))
+— the **whole round trip**. Triton's own per-request counters say how much of
+that is really the queue:
+
+| Concurrency | fps | client p50 | **server queue** | queue as % | in-flight | Little's law |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 1027.8 | 6.28 ms | **1.294 ms** | 20.6% | 8 | 7.78 ms |
+| 2 | 1128.2 | 11.29 ms | **1.304 ms** | 11.5% | 16 | 14.18 ms |
+| 4 | 1359.1 | 19.38 ms | **1.073 ms** | 5.5% | 32 | 23.54 ms |
+| 8 | 1613.7 | 37.10 ms | 16.370 ms | 44.1% | 64 | 39.66 ms |
+| 16 | 1528.3 | 72.65 ms | **4.358 ms** | 6.0% | 128 | 83.75 ms |
+
+Script: [`d_decompose.sh`](../scripts/d_decompose.sh) → raw data:
+[`results/v3/d_latency_decomposition.tsv`](../results/v3/d_latency_decomposition.tsv).
+
+**At concurrency 4, the batching queue accounts for 5.5% of the latency.** The
+other 94.5% is not the server waiting for batch-mates.
+
+### It is Little's law on the client's own window
+
+The async client holds `DEPTH = 8` requests in flight *per stream*
+([`grpc_async_client.cu:132`](../cpp/src/grpc_async_client.cu)), so at N streams
+there are 8N outstanding. Little's law then fixes the latency:
+
+> latency ≈ in-flight ÷ throughput
+
+That last column is `8N / fps`, computed with no reference to the measurement,
+and it tracks the observed p50 across a **12x range** — consistently 10-15%
+high, which is the right sign for a p50 against a mean-based law.
+
+So D's latency is a property of **how many requests the client chooses to keep in
+flight**, not of the batching window. Halve `DEPTH` and the latency roughly
+halves; throughput falls too, because the batches have less to draw on. The
+README's second lesson — *D's 1665 fps and its 74 ms are the same number read two
+ways* — turns out to be literally true, as a ratio, and for a different reason
+than the one originally given.
+
+### What this does not change
+
+The **advice is unaffected**. D really does answer in 6-74 ms, that really is too
+slow for a control loop, and the throughput really is the highest measured. Only
+the *mechanism* was mislabelled: the cost is pipelining depth, not queue time.
+
+It does change one practical thing. If D's latency is what rules it out for you,
+the lever is **`DEPTH`**, which is a client constant, not
+`max_queue_delay_microseconds`, which is where you would naturally reach first
+and which [the knob sweep](#the-knobs) already showed barely moves anything.
+
+### One number that does not fit
+
+Concurrency 8 reports 16.4 ms of queue — far out of line with 1.07 ms at
+concurrency 4 and 4.36 ms at 16, and the only row where the queue is the largest
+term. It reproduced across runs. It is left in rather than smoothed, because an
+unexplained 44% is more useful to a reader than a tidy table, but it is not
+understood and should not be built on.
+
 ## What batch size does D actually form?
 
 The study calls flow D "batch-8" throughout, because `yolov8s_dyn` is built on a
@@ -80,7 +140,9 @@ C++.**
 
 ## The bill, in the latency column
 
-Those 1665 frames each waited 6–74 ms in the queue for their batch-mates:
+Those 1665 frames each took 6–74 ms from submission to answer
+(**not** all of it queue wait — see
+[where D's latency actually goes](#where-ds-latency-actually-goes)):
 
 | Concurrency | Total fps | Queue wait (p50) | GPU service/frame |
 |---|---|---|---|

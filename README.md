@@ -38,7 +38,7 @@ turned out to be wrong, and what it took to get a trustworthy one.
 | [Stage decomposition](docs/stage-decomposition.md) | Where does the time actually go? | With zero-copy, Triton's whole framework costs 0.18 ms |
 | [Model cost](docs/model-scaling.md) | When does the plumbing stop mattering? | Non-engine cost is fixed at 0.256 ms; A2 crosses under 10% at a 2.3 ms engine, B1 not until 10.4 ms |
 | [Across architectures](docs/model-zoo.md) | What sets the plumbing cost? | Output bytes / 25 GB/s — and output shape is an architectural choice: DeepLabV3 pays 57% transport, SegFormer-B0 14%, at the same engine cost. Params predict engine time at r&sup2; 0.80 in bulk, but ResNet50 and YOLO11l share 25M and differ 5.8x |
-| [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms queue wait |
+| [Batching](docs/batching.md) | Is dynamic batching free? | No — 37% cheaper GPU/frame, paid in 6–74 ms added latency (mostly in-flight depth, not queue) |
 | [Triton tuning](docs/triton-tuning.md) | Were the Triton knobs right? | `count:2` validated (+30% over 1); graphs and instances are substitutes |
 | [CUDA graphs](docs/cuda-graphs.md) | Is the engine ceiling real? | No — ~0.13 ms of it is launch overhead; +11.8% inside A2, and its plateau rises 1167→1249 fps |
 | [In-graph NMS](docs/in-graph-nms.md) | Is the 2.82 MB output worth removing? | On raw gRPC yes — +33% despite a 19% slower engine; on zero-copy paths, no |
@@ -102,7 +102,7 @@ is only as good as its client; its scheduler is the irreplaceable part.
 | Live camera, lowest latency, full control | **A2** — C++ TRT full-CUDA | **1.23 ms** | 809 fps | fastest per frame; zero dependencies |
 | Live multi-stream, want a server | **B2** — Triton + CUDA shm | 1.28 ms | 1131 fps | ≈A2 latency + Triton ops (reload, metrics) |
 | Python-only team | **C2** — Triton + numpy + sys-shm | 1.69 ms | 1038 fps | within 0.4 ms of C++ with pure-Python client |
-| Offline / max throughput, latency negotiable | **D** — Triton async, batch-8 | 6.2–74 ms wait (0.61 ms GPU service) | 1640–1665 fps | cheapest GPU service per frame (0.61 ms) |
+| Offline / max throughput, latency negotiable | **D** — Triton async, batch-8 | 6.2–74 ms latency (0.61 ms engine floor) | 1640–1665 fps | cheapest GPU service per frame (0.61 ms) |
 | Multi-model production serving | **D** — 3 models × async batch-8 | 29–59 ms wait | **1799–1816 fps** | Triton scheduler has no hand-rolled equivalent |
 | Edge product, NVIDIA-supported stack | **E** — DeepStream | 1.50 ms (1 stream) | 45 fps/stream (source-bound) | zero custom code; NVDEC→infer integrated |
 
@@ -113,7 +113,9 @@ in latency headroom, not capability.
 
 1. **A benchmark that saturates the source measures the source.**
 2. **Latency and throughput are different products** — D's 1665 fps and its 74 ms
-   queue wait are the same number read two ways.
+   latency are the same number read two ways, and literally so: latency ≈
+   in-flight requests ÷ throughput ([Little's law](docs/batching.md#where-ds-latency-actually-goes)).
+   Most of it is the client's own 8-deep window, not Triton's batching queue.
 3. **The GPU is almost never the bottleneck at the edge.** The fight is over PCIe
    round trips, serialization, and interpreter locks.
 4. **Match preprocessing bit-for-bit before comparing pipelines.**

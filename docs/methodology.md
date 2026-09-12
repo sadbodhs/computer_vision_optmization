@@ -53,7 +53,10 @@ point of [flow D](batching.md).
 
 **Flow D reads differently on purpose**: `1041↑ · wait 6.2 · svc 0.61` means each
 frame **waits 6.2 ms** for its batch to fill, then the GPU **services it in
-0.61 ms**. D's high fps is *bought with queue wait*.
+0.61 ms**. D's high fps is *bought with latency* — though most of that latency
+is the client's in-flight window rather than the batching queue, and `svc 0.61`
+is the engine's floor rather than a measurement. Both are unpicked in
+[batching](batching.md#where-ds-latency-actually-goes).
 
 ### Notation
 
