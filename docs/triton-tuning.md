@@ -80,6 +80,76 @@ execution.** If you enable graphs in production, treat instance count as part of
 the same change and test them together — a config that works at `count: 2` can
 hard-fail at `count: 4`.
 
+## 5. Instances across the concurrency range — and why D barely cares
+
+Everything above was measured at **one operating point**: B2, four streams. That
+is one cell of a grid, and `count: 2` was declared "the right call" from it. Run
+the grid — three instance counts x three concurrencies x both server flows — and
+the single number splits into two quite different stories.
+
+![Instance count across concurrency, for B2 and D](img/instance-grid.png)
+
+| Flow | Concurrency | count=1 | count=2 | count=4 | gain 1→4 |
+|---|---:|---:|---:|---:|---:|
+| **B2** | 1 | 629.4 | 635.9 | 653.8 | **+3.9%** |
+| **B2** | 4 | 808.5 | 1085.8 | 1083.6 | **+34.0%** |
+| **B2** | 16 | 817.1 | 1114.5 | 1192.0 | **+45.9%** |
+| **D** | 1 | 1036.1 | 1044.4 | 1039.5 | **+0.3%** |
+| **D** | 4 | 1314.2 | 1356.1 | 1363.6 | **+3.8%** |
+| **D** | 16 | 1509.6 | 1566.4 | 1634.9 | **+8.3%** |
+
+Script: [`instance_grid.sh`](../scripts/instance_grid.sh) ·
+figure: [`plot_instance_grid.py`](../scripts/plot_instance_grid.py) ·
+raw data: [`results/v3/instance_grid.tsv`](../results/v3/instance_grid.tsv).
+
+**Three findings, none of which the single cell could show.**
+
+**1. At concurrency 1, instances do nothing — for either flow.** +3.9% and +0.3%.
+Obvious in hindsight: with one request in flight, every extra instance is idle.
+This matters beyond the knob, because it clears a suspected confound. B2 runs
+with two server-side instances while A2 at `--streams 1` has a single execution
+context, so the published **A2 1.23 ms vs B2 1.28 ms** comparison looked like it
+might be handing Triton double the resources. It is not: at concurrency 1 the
+second instance contributes nothing, and that 0.05 ms really is framework
+overhead.
+
+**2. For B2, `count: 2` is worth far more than the original +30.4% suggested** —
++34% at four streams and +36% at sixteen, with `count: 4` adding little beyond
+that (0% and +7%). The original conclusion holds and understates itself.
+
+**3. For D, instances almost do not matter: +8.3% at best, against B2's +45.9%.**
+
+### Why: instances and batching are substitutes
+
+The reason D shrugs is that **it already has a mechanism for keeping the GPU
+fed.** Instances and dynamic batching solve the same problem — get more than one
+frame of work in front of the device at a time — and if one is doing the job the
+other has nothing left to add.
+
+Triton makes the trade visible. Watch the batch size D actually forms as
+instances are added:
+
+| Concurrency | count=1 | count=2 | count=4 |
+|---|---:|---:|---:|
+| 4 | **5.41** | 4.00 | 4.00 |
+| 16 | **7.91** | 6.27 | 6.13 |
+
+With one instance, requests queue longer and **bigger batches form**. With four,
+they are picked up sooner and batches stay small. Throughput lands in the same
+place either way — the scheduler trades one against the other to reach the same
+ceiling.
+
+That is the second such pair on this page. [Section 2](#2-cuda-graphs-and-multiple-instances-are-substitutes-not-additives)
+found CUDA graphs and instances are substitutes rather than additives. So:
+
+> **Instances, CUDA graphs and dynamic batching are three mechanisms for one
+> problem — keeping the GPU busy. Pull whichever lever suits your latency
+> budget, then stop; the second and third are mostly redundant.**
+
+Which reframes the tuning advice. The question is not "have I turned everything
+on", it is "which *one* of these fits my latency constraint" — batching if you
+can afford the wait, instances if you cannot, graphs if you need the tail.
+
 ## Not covered
 
 - Only yolov8s and only flow B2. Flow D's dynamic-batch engines need graph capture

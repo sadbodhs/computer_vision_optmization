@@ -7,6 +7,23 @@ recipe: [`docker/README.md`](../docker/README.md).
 
 ---
 
+!!! danger "Do not export into `triton/models/`"
+
+    That directory is Triton's `--model-repository`, and Triton treats **every
+    subdirectory of it as a model**. Put a folder of `.onnx` files there and it
+    has no version subdirectory, the load fails, and the default
+    `--exit-on-error=true` takes the entire server down.
+
+    The failure is delayed, which is what makes it nasty: the *running* server
+    is unaffected, so nothing breaks until the next container restart — which
+    may be days later and for an unrelated reason. This study lost a server to
+    exactly that, and the restart that exposed it was chasing something else
+    entirely.
+
+    Export to a path outside the model repository. Engines with a
+    `1/model.plan` and no `config.pbtxt` are fine — TensorRT plans auto-complete.
+
+
 ## From a clean clone
 
 ```bash

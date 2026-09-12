@@ -5,6 +5,20 @@ Covers the non-YOLO half of the sweep. ultralytics models are exported by
 scripts/export_one.sh; everything here comes from torchvision or transformers.
 
 Usage: python3 export_zoo.py <name> <out_dir>
+
+NOTE ON WHERE TO PUT EXPORTS
+----------------------------
+Do NOT write ONNX exports under triton/models/ (mounted as /models). That path
+is Triton's --model-repository, and Triton treats EVERY subdirectory of it as a
+model. A directory of .onnx files has no version subdirectory, so the load
+fails, and Triton's default --exit-on-error=true then takes the whole server
+down. The failure is delayed and confusing: the running server is unaffected,
+so nothing breaks until the next container restart, which may be days later and
+for an unrelated reason.
+
+Use a path outside the model repository (this host uses
+/home/suchi/sadbodh/model_exports). Engines with a 1/model.plan and no
+config.pbtxt are fine - TensorRT plans auto-complete.
 """
 import os
 import sys
