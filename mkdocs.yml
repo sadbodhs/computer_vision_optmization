@@ -1,7 +1,7 @@
 site_name: Triton vs TensorRT vs DeepStream
 site_description: Measured comparison of CV inference serving pipelines on an RTX 3090
-repo_url: https://github.com/sadbodhs/computer_vision_optmization
-repo_name: sadbodhs/computer_vision_optmization
+repo_url: https://github.com/sadbodhs/computer_vision_optimization
+repo_name: sadbodhs/computer_vision_optimization
 docs_dir: site_src
 
 theme:

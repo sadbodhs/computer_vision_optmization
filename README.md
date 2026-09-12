@@ -1,6 +1,6 @@
 # Triton vs Pure TensorRT vs DeepStream — Inference Pipeline Benchmark
 
-**📖 [Read this as a site](https://sadbodhs.github.io/computer_vision_optmization/overview/)** — searchable, with an interactive version
+**📖 [Read this as a site](https://sadbodhs.github.io/computer_vision_optimization/overview/)** — searchable, with an interactive version
 of the chart below.
 
 One question, answered with measurements: *for the same YOLO model on the same

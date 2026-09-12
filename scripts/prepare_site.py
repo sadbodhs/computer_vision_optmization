@@ -24,7 +24,7 @@ import sys
 
 REPO = sys.argv[1] if len(sys.argv) > 1 else "."
 OUT = sys.argv[2] if len(sys.argv) > 2 else "/tmp/site/src"
-BLOB = "https://github.com/sadbodhs/computer_vision_optmization/blob/main"
+BLOB = "https://github.com/sadbodhs/computer_vision_optimization/blob/main"
 
 HOME = "introduction.md"      # the doc promoted to index.md
 README_PAGE = "overview.md"   # where README.md lands in the site tree
@@ -121,7 +121,7 @@ overview_md = link_re.sub(fix_readme_link, readme)
 # The README's "read this as a site" link is for repo visitors; on the site it
 # points at the site you are already on, so drop it.
 SITE_LINK = ("**\U0001F4D6 [Read this as a site](%s)** — searchable, with an interactive version\n"
-             "of the chart below.\n\n" % "https://sadbodhs.github.io/computer_vision_optmization/overview/")
+             "of the chart below.\n\n" % "https://sadbodhs.github.io/computer_vision_optimization/overview/")
 if SITE_LINK in overview_md:
     overview_md = overview_md.replace(SITE_LINK, "")
     print("dropped the self-referential site link from the overview")
